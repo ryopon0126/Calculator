@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="1/3計算">
+<meta name="theme-color" content="#1a1a2e">
+<title>在庫落とし日 計算機</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F2F0EC;
+  --surface: #FFFFFF;
+  --surface2: #F7F5F2;
+  --border: #E4E0D8;
+  --text: #1E1C18;
+  --sub: #6B6760;
+  --accent: #C85A2E;
+  --accent2: #a04020;
+  --green: #3A7D58;
+  --green-dim: #EAF5EF;
+  --yellow: #9A7A18;
+  --yellow-dim: #FBF5E0;
+  --red: #AA2828;
+  --red-dim: #FCEAEA;
+  --purple: #6A3EA1;
+  --purple-dim: #F3EDFF;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; }
+
+body {
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ── HEADER ── */
+.hdr {
+  padding: 20px 20px 18px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 0 0 20px 20px;
+  margin-bottom: 4px;
+}
+
+.hdr-logo {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+}
+
+.logo-mark {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,.2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+
+.hdr-title { font-size: 17px; font-weight: 900; letter-spacing: -.02em; color: #fff; }
+.hdr-sub { font-size: 11px; color: rgba(255,255,255,.75); letter-spacing: .04em; margin-left: 46px; }
+
+/* ── SCROLL ── */
+.scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 20px calc(env(safe-area-inset-bottom) + 32px);
+  display: flex; flex-direction: column; gap: 14px;
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 10px; font-weight: 700; color: var(--sub);
+  letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+/* ── INPUTS ── */
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+
+.label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--sub);
+  letter-spacing: .04em; margin-bottom: 8px;
+}
+
+.label-badge {
+  background: var(--accent);
+  color: #fff; font-size: 9px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px; letter-spacing: .04em;
+}
+
+input[type="date"], input[type="number"] {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 16px; font-weight: 500;
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+  color: var(--text);
+  outline: none;
+  -webkit-appearance: none;
+  transition: border-color .15s;
+  color-scheme: light;
+}
+input:focus { border-color: var(--accent); }
+
+/* プリセットボタン */
+.presets {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+
+.pbtn {
+  padding: 5px 13px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  font-size: 12px; font-weight: 700;
+  color: var(--sub); cursor: pointer;
+  font-family: inherit;
+  transition: all .12s;
+}
+.pbtn:active, .pbtn.on {
+  background: rgba(232,132,90,.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── 計算ボタン ── */
+.calc-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; border: none; border-radius: 14px;
+  padding: 17px; font-size: 16px; font-weight: 900;
+  font-family: inherit; cursor: pointer;
+  letter-spacing: .02em;
+  transition: opacity .1s, transform .1s;
+  box-shadow: 0 4px 16px rgba(200,90,46,.2);
+}
+.calc-btn:active { opacity: .88; transform: scale(.98); }
+
+.reset-btn {
+  width: 100%;
+  background: var(--surface);
+  color: var(--sub);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 14px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  transition: all .15s;
+  display: none;
+}
+.reset-btn:active { background: var(--surface2); }
+
+/* ── 結果 ── */
+.result-card {
+  border-radius: 18px;
+  padding: 22px;
+  border: 1.5px solid;
+  animation: fadeUp .25s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.result-card.ok     { background:var(--green-dim);  border-color:rgba(58,125,88,.25); }
+.result-card.soon   { background:var(--yellow-dim); border-color:rgba(154,122,24,.25); }
+.result-card.urgent { background:var(--red-dim);    border-color:rgba(170,40,40,.25); }
+.result-card.passed { background:var(--purple-dim); border-color:rgba(106,62,161,.25); }
+
+.result-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.result-card.ok     .result-label { color:var(--green); }
+.result-card.soon   .result-label { color:var(--yellow); }
+.result-card.urgent .result-label { color:var(--red); }
+.result-card.passed .result-label { color:var(--purple); }
+
+.result-date {
+  font-size: 36px; font-weight: 900;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: -.02em; line-height: 1;
+  margin-bottom: 8px;
+}
+.result-card.ok     .result-date { color:var(--green); }
+.result-card.soon   .result-date { color:var(--yellow); }
+.result-card.urgent .result-date { color:var(--red); }
+.result-card.passed .result-date { color:var(--purple); }
+
+.result-status {
+  font-size: 14px; font-weight: 700;
+  margin-bottom: 16px; line-height: 1.5;
+}
+
+.result-rows {
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.result-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface2);
+  border-radius: 10px; padding: 10px 14px;
+}
+
+.result-row-label { font-size: 11px; color: var(--sub); font-weight: 500; }
+.result-row-value { font-size: 13px; font-weight: 700; font-family: 'DM Mono', monospace; }
+
+/* 計算式バッジ */
+.formula-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.formula-title {
+  font-size: 10px; font-weight: 700; color: var(--sub);
+  letter-spacing: .08em; margin-bottom: 8px;
+}
+
+.formula-text {
+  font-size: 13px; font-family: 'DM Mono', monospace;
+  color: var(--accent); line-height: 1.8;
+}
+
+/* 注意バナー */
+.note {
+  background: var(--yellow-dim);
+  border: 1px solid rgba(154,122,24,.2);
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 12px; color: var(--yellow);
+  line-height: 1.6;
+}
+
+/* empty state */
+.empty-hint {
+  text-align: center; padding: 24px 0;
+  color: var(--sub); font-size: 13px; line-height: 1.8;
+}
+.empty-icon { font-size: 36px; margin-bottom: 8px; opacity: .4; }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">
+    <div class="logo-mark">⅓</div>
+    <div class="hdr-title">在庫落とし日 計算機</div>
+  </div>
+  <div class="hdr-sub">1/3ルール ー 賞味期限から在庫落とし日を算出</div>
+</div>
+
+<div class="scroll">
+
+  <!-- 入力カード -->
+  <div class="card">
+    <div class="card-title">📋 入力</div>
+
+    <div class="field">
+      <div class="label">
+        賞味期限
+        <span class="label-badge">必須</span>
+      </div>
+      <input type="date" id="f-expiry" >
+    </div>
+
+    <div class="field">
+      <div class="label">
+        基本賞味期限（日数）
+        <span class="label-badge">必須</span>
+      </div>
+      <input type="number" id="f-shelf" placeholder="下から選択または直接入力してください" min="1">
+      <div class="presets">
+        <button class="pbtn" data-d="30">1ヶ月</button>
+        <button class="pbtn" data-d="90">3ヶ月</button>
+        <button class="pbtn" data-d="180">半年</button>
+        <button class="pbtn" data-d="360">360日</button>
+        <button class="pbtn" data-d="365">1年</button>
+        <button class="pbtn" data-d="500">500日</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 計算ボタン -->
+  <button class="calc-btn" id="calc-btn">在庫落とし日を計算する</button>
+  <button class="reset-btn" id="reset-btn">↺　リセット</button>
+
+  <!-- 結果エリア -->
+  <div id="result-area">
+    <div class="empty-hint">
+      <div class="empty-icon">📅</div>
+      賞味期限と基本賞味期限を入力して<br>計算ボタンを押してください
+    </div>
+  </div>
+
+  <!-- 使い方 -->
+  <div class="card">
+    <div class="card-title">📖 使い方</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+        <div style="font-size:13px;color:var(--sub);line-height:1.7"><strong style="color:var(--text)">賞味期限</strong>を入力してください。<br>商品パッケージに記載されている日付を選択します。</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
+        <div style="font-size:13px;color:var(--sub);line-height:1.7"><strong style="color:var(--text)">基本賞味期限</strong>を選択または入力してください。<br>商品の製造日から賞味期限までの総日数です。</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+        <div style="font-size:13px;color:var(--sub);line-height:1.7">「<strong style="color:var(--text)">在庫落とし日を計算する</strong>」を押すと、<br>1/3ルールに基づいた在庫落とし日が表示されます。</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── ユーティリティ ──
+function daysLeft(dateStr) {
+  const t = new Date(); t.setHours(0,0,0,0);
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.ceil((d - t) / 86400000);
+}
+
+function removalDate(expiry, shelf) {
+  const d = new Date(expiry);
+  d.setDate(d.getDate() - Math.floor(shelf / 3));
+  return d.toISOString().split('T')[0];
+}
+
+function fmt(dateStr) {
+  const [y,m,d] = dateStr.split('-');
+  return `${y}/${m}/${d}`;
+}
+
+function fmtShort(dateStr) {
+  const [y,m,d] = dateStr.split('-');
+  return `${m}/${d}`;
+}
+
+// ── プリセット ──
+document.querySelectorAll('.pbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('f-shelf').value = btn.dataset.d;
+  });
+});
+
+// 数字を直接入力したらプリセット選択を解除
+document.getElementById('f-shelf').addEventListener('input', () => {
+  const v = document.getElementById('f-shelf').value;
+  document.querySelectorAll('.pbtn').forEach(b =>
+    b.classList.toggle('on', b.dataset.d === v)
+  );
+});
+
+// ── 計算 ──
+document.getElementById('calc-btn').addEventListener('click', calculate);
+document.getElementById('f-expiry').addEventListener('change', () => {
+  if(document.getElementById('f-shelf').value) calculate();
+});
+document.getElementById('reset-btn').addEventListener('click', () => {
+  document.getElementById('f-expiry').value = '';
+  document.getElementById('f-shelf').value  = '';
+  document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('on'));
+  document.getElementById('result-area').innerHTML = `
+    <div class="empty-hint">
+      <div class="empty-icon">📅</div>
+      賞味期限と基本賞味期限を入力して<br>計算ボタンを押してください
+    </div>`;
+  document.getElementById('reset-btn').style.display = 'none';
+  document.getElementById('calc-btn').style.display  = 'block';
+});
+
+document.getElementById('f-shelf').addEventListener('change', () => {
+  if(document.getElementById('f-expiry').value) calculate();
+});
+
+function calculate() {
+  const expiry = document.getElementById('f-expiry').value;
+  const shelf  = parseInt(document.getElementById('f-shelf').value);
+  const area   = document.getElementById('result-area');
+
+  if (!expiry || !shelf || shelf < 1) {
+    area.innerHTML = `<div class="note">⚠️ 賞味期限と基本賞味期限（日数）を両方入力してください</div>`;
+    return;
+  }
+
+  const rd      = removalDate(expiry, shelf);
+  const dtrNum  = daysLeft(rd);       // 在庫落とし日まで
+  const dexpNum = daysLeft(expiry);   // 賞味期限まで
+  const rmDays  = Math.floor(shelf / 3);
+
+  // ステータス判定
+  let cls, emoji, statusText;
+  if (dexpNum < 0) {
+    cls = 'passed'; emoji = '🚨'; statusText = `賞味期限を ${Math.abs(dexpNum)} 日超過しています`;
+  } else if (dtrNum < 0) {
+    cls = 'passed'; emoji = '🟣'; statusText = `在庫落とし日を ${Math.abs(dtrNum)} 日超過しています`;
+  } else if (dtrNum === 0) {
+    cls = 'urgent'; emoji = '⚠️'; statusText = '本日が在庫落とし日です';
+  } else if (dtrNum <= 7) {
+    cls = 'urgent'; emoji = '⚠️'; statusText = `在庫落とし日まで残り ${dtrNum} 日`;
+  } else if (dtrNum <= 30) {
+    cls = 'soon'; emoji = '📅'; statusText = `在庫落とし日まで残り ${dtrNum} 日`;
+  } else {
+    cls = 'ok'; emoji = '✅'; statusText = `在庫落とし日まで残り ${dtrNum} 日`;
+  }
+
+  area.innerHTML = `
+    <div class="result-card ${cls}">
+      <div class="result-label">${emoji} 在庫落とし日</div>
+      <div class="result-date">${fmt(rd)}</div>
+      <div class="result-status">${statusText}</div>
+      <div class="result-rows">
+        <div class="result-row">
+          <span class="result-row-label">賞味期限</span>
+          <span class="result-row-value">${fmt(expiry)}（残${dexpNum >= 0 ? dexpNum + '日' : Math.abs(dexpNum) + '日超過'}）</span>
+        </div>
+        <div class="result-row">
+          <span class="result-row-label">基本賞味期限</span>
+          <span class="result-row-value">${shelf} 日</span>
+        </div>
+        <div class="result-row">
+          <span class="result-row-label">差し引き日数（÷3）</span>
+          <span class="result-row-value">${rmDays} 日前</span>
+        </div>
+      </div>
+      <div class="formula-box" style="margin-top:14px">
+        <div class="formula-title">今回の計算</div>
+        <div class="formula-text">
+          ${fmt(expiry)} − ${rmDays}日<br>= ${fmt(rd)}
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('reset-btn').style.display = 'block';
+  document.getElementById('calc-btn').style.display  = 'none';
+}
+</script>
+</body>
+</html>
