@@ -140,6 +140,29 @@ input:focus { border-color: var(--accent); }
   color: var(--accent);
 }
 
+/* ── カスタムプリセット ── */
+.preset-add-btn {
+  padding: 5px 11px; border-radius: 20px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  font-size: 12px; font-weight: 700;
+  color: var(--sub); cursor: pointer;
+  font-family: inherit; transition: all .12s;
+  display: flex; align-items: center; gap: 4px;
+}
+.preset-add-btn:active {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(200,90,46,.08);
+}
+.pbtn-custom {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.pbtn-del {
+  font-size: 11px; color: var(--sub); opacity: .6;
+  padding: 0 2px; cursor: pointer; line-height: 1;
+}
+.pbtn-del:hover { opacity: 1; color: var(--red); }
+
 /* ── 計算ボタン ── */
 .calc-btn {
   width: 100%;
@@ -288,14 +311,8 @@ input:focus { border-color: var(--accent); }
         <span class="label-badge">必須</span>
       </div>
       <input type="number" id="f-shelf" placeholder="下から選択または直接入力してください" min="1">
-      <div class="presets">
-        <button class="pbtn" data-d="30">1ヶ月</button>
-        <button class="pbtn" data-d="90">3ヶ月</button>
-        <button class="pbtn" data-d="120">4ヶ月</button>
-        <button class="pbtn" data-d="180">半年</button>
-        <button class="pbtn" data-d="360">360日</button>
-        <button class="pbtn" data-d="365">1年</button>
-        <button class="pbtn" data-d="500">500日</button>
+      <div class="presets" id="presets-wrap">
+        <!-- JSで動的に生成 -->
       </div>
     </div>
   </div>
@@ -358,21 +375,120 @@ function fmtShort(dateStr) {
 }
 
 // ── プリセット ──
-document.querySelectorAll('.pbtn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('on'));
-    btn.classList.add('on');
-    document.getElementById('f-shelf').value = btn.dataset.d;
-  });
-});
+const DEFAULT_PRESETS = [
+  { d: 30,  label: '1ヶ月' },
+  { d: 90,  label: '3ヶ月' },
+  { d: 120, label: '4ヶ月' },
+  { d: 180, label: '半年'  },
+  { d: 360, label: '360日' },
+  { d: 365, label: '1年'   },
+  { d: 500, label: '500日' },
+];
+const STORAGE_KEY = 'custom_presets_v1';
 
-// 数字を直接入力したらプリセット選択を解除
+function loadPresets() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch(e) { return []; }
+}
+
+function savePresets(list) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) {}
+}
+
+function getAllPresets() {
+  const custom = loadPresets();
+  // DEFAULT + カスタム（重複除外）
+  const all = [...DEFAULT_PRESETS];
+  custom.forEach(c => {
+    if (!all.find(p => p.d === c.d)) all.push(c);
+  });
+  all.sort((a, b) => a.d - b.d);
+  return all;
+}
+
+function renderPresets() {
+  const wrap = document.getElementById('presets-wrap');
+  const all = getAllPresets();
+  const custom = loadPresets();
+  const curVal = document.getElementById('f-shelf').value;
+
+  wrap.innerHTML = '';
+  all.forEach(p => {
+    const isCustom = custom.find(c => c.d === p.d);
+    const btn = document.createElement('button');
+    btn.className = 'pbtn' + (isCustom ? ' pbtn-custom' : '');
+    btn.dataset.d = p.d;
+    if (String(p.d) === curVal) btn.classList.add('on');
+
+    if (isCustom) {
+      btn.innerHTML = `${p.label}<span class="pbtn-del" data-d="${p.d}" title="削除">✕</span>`;
+    } else {
+      btn.textContent = p.label;
+    }
+
+    btn.addEventListener('click', (e) => {
+      if (e.target.classList.contains('pbtn-del')) {
+        // カスタム削除
+        const d = parseInt(e.target.dataset.d);
+        const list = loadPresets().filter(c => c.d !== d);
+        savePresets(list);
+        renderPresets();
+        return;
+      }
+      renderPresets();
+      btn.classList.add('on');
+      document.getElementById('f-shelf').value = p.d;
+    });
+
+    wrap.appendChild(btn);
+  });
+
+  // ＋追加ボタン
+  const addBtn = document.createElement('button');
+  addBtn.className = 'preset-add-btn';
+  addBtn.innerHTML = '＋ 追加';
+  addBtn.addEventListener('click', addCustomPreset);
+  wrap.appendChild(addBtn);
+}
+
+function addCustomPreset() {
+  const val = parseInt(document.getElementById('f-shelf').value);
+  if (!val || val < 1) {
+    alert('先に日数を入力してください');
+    return;
+  }
+  const all = getAllPresets();
+  if (all.find(p => p.d === val)) {
+    alert(`${val}日 はすでに登録されています`);
+    return;
+  }
+  const label = val >= 365 && val % 365 === 0
+    ? `${val/365}年`
+    : val >= 30 && val % 30 === 0
+    ? `${val/30}ヶ月`
+    : `${val}日`;
+  const custom = loadPresets();
+  custom.push({ d: val, label });
+  savePresets(custom);
+  renderPresets();
+  // 追加したボタンをON状態に
+  document.querySelectorAll('.pbtn').forEach(b =>
+    b.classList.toggle('on', parseInt(b.dataset.d) === val)
+  );
+}
+
+// 数字を直接入力したらプリセット選択を反映
 document.getElementById('f-shelf').addEventListener('input', () => {
   const v = document.getElementById('f-shelf').value;
   document.querySelectorAll('.pbtn').forEach(b =>
     b.classList.toggle('on', b.dataset.d === v)
   );
 });
+
+// 初期描画
+renderPresets();
 
 // ── 計算 ──
 document.getElementById('calc-btn').addEventListener('click', calculate);
