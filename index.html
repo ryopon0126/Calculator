@@ -161,11 +161,11 @@ document.getElementById('qr-close').addEventListener('click', closeQRScanner);
 // ── 初期化：Firebase設定があれば自動接続 ──
 (function init() {
   _regs = localLoadRegs();
+  updateSummary();
   const cfg = loadFbConfig();
   if (cfg && cfg.apiKey && cfg.databaseURL) {
     initFirebase(cfg); // onValueでデータ取得→_regs更新→renderCalendar
   } else {
-    // Firebase未設定の場合もローカルデータでバナー表示
     setTimeout(showAlertBanner, 500);
   }
 })();
@@ -385,6 +385,134 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 
 // ════════════════════════════
 //  PDF エクスポート（ブラウザ印刷）
+
+// ════════════════════════════
+//  ダークモード
+// ════════════════════════════
+const DARK_KEY = 'darkmode_v1';
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem(DARK_KEY, isDark ? '1' : '0');
+  document.getElementById('btn-darkmode').textContent = isDark ? '☀️' : '🌙';
+}
+// 起動時に設定を復元
+(function initDark() {
+  if (localStorage.getItem(DARK_KEY) === '1') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-darkmode');
+    if (btn) btn.textContent = '☀️';
+  }
+})();
+
+// ════════════════════════════
+//  サマリー更新
+// ════════════════════════════
+function updateSummary() {
+  const regs = loadRegs();
+  const total  = regs.length;
+  const done   = regs.filter(r => r.done).length;
+  const urgent = regs.filter(r => !r.done && daysLeft(r.rd) <= 7).length;
+  const sTotal  = document.getElementById('s-total');
+  const sUrgent = document.getElementById('s-urgent');
+  const sDone   = document.getElementById('s-done');
+  if (sTotal)  sTotal.textContent  = total;
+  if (sUrgent) sUrgent.textContent = urgent;
+  if (sDone)   sDone.textContent   = done;
+}
+
+// ════════════════════════════
+//  編集モーダル
+// ════════════════════════════
+let _editingId = null;
+
+function openEditModal(id) {
+  const regs = loadRegs();
+  const r = regs.find(x => x.id === id);
+  if (!r) return;
+  _editingId = id;
+  document.getElementById('edit-person').value  = r.person  || '';
+  document.getElementById('edit-company').value = r.company || r.name || '';
+  document.getElementById('edit-partno').value  = r.partno  || '';
+  document.getElementById('edit-expiry').value  = r.expiry  || '';
+  document.getElementById('edit-shelf').value   = r.shelf   || '';
+  hideEditSuggest();
+  document.getElementById('edit-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('edit-person').focus(), 300);
+}
+
+function closeEditModal() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  _editingId = null;
+  hideEditSuggest();
+}
+
+function confirmEdit() {
+  if (!_editingId) return;
+  const person  = document.getElementById('edit-person').value.trim();
+  const company = document.getElementById('edit-company').value.trim() || '未設定';
+  const partno  = document.getElementById('edit-partno').value.trim();
+  const expiry  = document.getElementById('edit-expiry').value;
+  const shelf   = parseInt(document.getElementById('edit-shelf').value);
+  if (!expiry || !shelf) { showToast('⚠️ 賞味期限と基本賞味期限は必須です'); return; }
+
+  const rd  = removalDate(expiry, shelf);
+  const regs = loadRegs().map(r => r.id === _editingId
+    ? { ...r, person, company, partno, expiry, shelf, rd }
+    : r
+  );
+  saveRegs(regs);
+  closeEditModal();
+  renderRegList(loadRegs());
+  updateSummary();
+  showToast('✅ 編集を保存しました');
+}
+
+document.getElementById('edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+});
+['edit-person','edit-company','edit-partno','edit-expiry','edit-shelf'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmEdit();
+  });
+});
+
+// edit-company サジェスト
+document.getElementById('edit-company').addEventListener('input', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('focus', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('blur', () => {
+  setTimeout(hideEditSuggest, 150);
+});
+function showEditSuggest(val) {
+  const wrap = document.getElementById('edit-company-suggest');
+  const all  = getCompanyHistory();
+  const q    = val.trim().toLowerCase();
+  const matches = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  if (!matches.length) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = matches.slice(0,6).map(name => {
+    let html = name;
+    if (q) {
+      const idx = name.toLowerCase().indexOf(q);
+      html = name.slice(0,idx) + `<span class="suggest-match">${name.slice(idx,idx+q.length)}</span>` + name.slice(idx+q.length);
+    }
+    return `<div class="suggest-item" data-name="${name.replace(/"/g,'&quot;')}">${html}</div>`;
+  }).join('');
+  wrap.style.display = 'block';
+  wrap.querySelectorAll('.suggest-item').forEach(el => {
+    el.addEventListener('mousedown', e => e.preventDefault());
+    el.addEventListener('click', () => {
+      document.getElementById('edit-company').value = el.dataset.name;
+      hideEditSuggest();
+    });
+  });
+}
+function hideEditSuggest() {
+  const el = document.getElementById('edit-company-suggest');
+  if (el) el.style.display = 'none';
+}
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
 // ════════════════════════════
@@ -537,11 +665,11 @@ document.getElementById('qr-close').addEventListener('click', closeQRScanner);
 // ── 初期化：Firebase設定があれば自動接続 ──
 (function init() {
   _regs = localLoadRegs();
+  updateSummary();
   const cfg = loadFbConfig();
   if (cfg && cfg.apiKey && cfg.databaseURL) {
     initFirebase(cfg); // onValueでデータ取得→_regs更新→renderCalendar
   } else {
-    // Firebase未設定の場合もローカルデータでバナー表示
     setTimeout(showAlertBanner, 500);
   }
 })();
@@ -761,6 +889,134 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 
 // ════════════════════════════
 //  PDF エクスポート（ブラウザ印刷）
+
+// ════════════════════════════
+//  ダークモード
+// ════════════════════════════
+const DARK_KEY = 'darkmode_v1';
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem(DARK_KEY, isDark ? '1' : '0');
+  document.getElementById('btn-darkmode').textContent = isDark ? '☀️' : '🌙';
+}
+// 起動時に設定を復元
+(function initDark() {
+  if (localStorage.getItem(DARK_KEY) === '1') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-darkmode');
+    if (btn) btn.textContent = '☀️';
+  }
+})();
+
+// ════════════════════════════
+//  サマリー更新
+// ════════════════════════════
+function updateSummary() {
+  const regs = loadRegs();
+  const total  = regs.length;
+  const done   = regs.filter(r => r.done).length;
+  const urgent = regs.filter(r => !r.done && daysLeft(r.rd) <= 7).length;
+  const sTotal  = document.getElementById('s-total');
+  const sUrgent = document.getElementById('s-urgent');
+  const sDone   = document.getElementById('s-done');
+  if (sTotal)  sTotal.textContent  = total;
+  if (sUrgent) sUrgent.textContent = urgent;
+  if (sDone)   sDone.textContent   = done;
+}
+
+// ════════════════════════════
+//  編集モーダル
+// ════════════════════════════
+let _editingId = null;
+
+function openEditModal(id) {
+  const regs = loadRegs();
+  const r = regs.find(x => x.id === id);
+  if (!r) return;
+  _editingId = id;
+  document.getElementById('edit-person').value  = r.person  || '';
+  document.getElementById('edit-company').value = r.company || r.name || '';
+  document.getElementById('edit-partno').value  = r.partno  || '';
+  document.getElementById('edit-expiry').value  = r.expiry  || '';
+  document.getElementById('edit-shelf').value   = r.shelf   || '';
+  hideEditSuggest();
+  document.getElementById('edit-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('edit-person').focus(), 300);
+}
+
+function closeEditModal() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  _editingId = null;
+  hideEditSuggest();
+}
+
+function confirmEdit() {
+  if (!_editingId) return;
+  const person  = document.getElementById('edit-person').value.trim();
+  const company = document.getElementById('edit-company').value.trim() || '未設定';
+  const partno  = document.getElementById('edit-partno').value.trim();
+  const expiry  = document.getElementById('edit-expiry').value;
+  const shelf   = parseInt(document.getElementById('edit-shelf').value);
+  if (!expiry || !shelf) { showToast('⚠️ 賞味期限と基本賞味期限は必須です'); return; }
+
+  const rd  = removalDate(expiry, shelf);
+  const regs = loadRegs().map(r => r.id === _editingId
+    ? { ...r, person, company, partno, expiry, shelf, rd }
+    : r
+  );
+  saveRegs(regs);
+  closeEditModal();
+  renderRegList(loadRegs());
+  updateSummary();
+  showToast('✅ 編集を保存しました');
+}
+
+document.getElementById('edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+});
+['edit-person','edit-company','edit-partno','edit-expiry','edit-shelf'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmEdit();
+  });
+});
+
+// edit-company サジェスト
+document.getElementById('edit-company').addEventListener('input', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('focus', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('blur', () => {
+  setTimeout(hideEditSuggest, 150);
+});
+function showEditSuggest(val) {
+  const wrap = document.getElementById('edit-company-suggest');
+  const all  = getCompanyHistory();
+  const q    = val.trim().toLowerCase();
+  const matches = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  if (!matches.length) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = matches.slice(0,6).map(name => {
+    let html = name;
+    if (q) {
+      const idx = name.toLowerCase().indexOf(q);
+      html = name.slice(0,idx) + `<span class="suggest-match">${name.slice(idx,idx+q.length)}</span>` + name.slice(idx+q.length);
+    }
+    return `<div class="suggest-item" data-name="${name.replace(/"/g,'&quot;')}">${html}</div>`;
+  }).join('');
+  wrap.style.display = 'block';
+  wrap.querySelectorAll('.suggest-item').forEach(el => {
+    el.addEventListener('mousedown', e => e.preventDefault());
+    el.addEventListener('click', () => {
+      document.getElementById('edit-company').value = el.dataset.name;
+      hideEditSuggest();
+    });
+  });
+}
+function hideEditSuggest() {
+  const el = document.getElementById('edit-company-suggest');
+  if (el) el.style.display = 'none';
+}
 </script>
 <!-- QRスキャン -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js">
@@ -914,11 +1170,11 @@ document.getElementById('qr-close').addEventListener('click', closeQRScanner);
 // ── 初期化：Firebase設定があれば自動接続 ──
 (function init() {
   _regs = localLoadRegs();
+  updateSummary();
   const cfg = loadFbConfig();
   if (cfg && cfg.apiKey && cfg.databaseURL) {
     initFirebase(cfg); // onValueでデータ取得→_regs更新→renderCalendar
   } else {
-    // Firebase未設定の場合もローカルデータでバナー表示
     setTimeout(showAlertBanner, 500);
   }
 })();
@@ -1138,6 +1394,134 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 
 // ════════════════════════════
 //  PDF エクスポート（ブラウザ印刷）
+
+// ════════════════════════════
+//  ダークモード
+// ════════════════════════════
+const DARK_KEY = 'darkmode_v1';
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem(DARK_KEY, isDark ? '1' : '0');
+  document.getElementById('btn-darkmode').textContent = isDark ? '☀️' : '🌙';
+}
+// 起動時に設定を復元
+(function initDark() {
+  if (localStorage.getItem(DARK_KEY) === '1') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-darkmode');
+    if (btn) btn.textContent = '☀️';
+  }
+})();
+
+// ════════════════════════════
+//  サマリー更新
+// ════════════════════════════
+function updateSummary() {
+  const regs = loadRegs();
+  const total  = regs.length;
+  const done   = regs.filter(r => r.done).length;
+  const urgent = regs.filter(r => !r.done && daysLeft(r.rd) <= 7).length;
+  const sTotal  = document.getElementById('s-total');
+  const sUrgent = document.getElementById('s-urgent');
+  const sDone   = document.getElementById('s-done');
+  if (sTotal)  sTotal.textContent  = total;
+  if (sUrgent) sUrgent.textContent = urgent;
+  if (sDone)   sDone.textContent   = done;
+}
+
+// ════════════════════════════
+//  編集モーダル
+// ════════════════════════════
+let _editingId = null;
+
+function openEditModal(id) {
+  const regs = loadRegs();
+  const r = regs.find(x => x.id === id);
+  if (!r) return;
+  _editingId = id;
+  document.getElementById('edit-person').value  = r.person  || '';
+  document.getElementById('edit-company').value = r.company || r.name || '';
+  document.getElementById('edit-partno').value  = r.partno  || '';
+  document.getElementById('edit-expiry').value  = r.expiry  || '';
+  document.getElementById('edit-shelf').value   = r.shelf   || '';
+  hideEditSuggest();
+  document.getElementById('edit-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('edit-person').focus(), 300);
+}
+
+function closeEditModal() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  _editingId = null;
+  hideEditSuggest();
+}
+
+function confirmEdit() {
+  if (!_editingId) return;
+  const person  = document.getElementById('edit-person').value.trim();
+  const company = document.getElementById('edit-company').value.trim() || '未設定';
+  const partno  = document.getElementById('edit-partno').value.trim();
+  const expiry  = document.getElementById('edit-expiry').value;
+  const shelf   = parseInt(document.getElementById('edit-shelf').value);
+  if (!expiry || !shelf) { showToast('⚠️ 賞味期限と基本賞味期限は必須です'); return; }
+
+  const rd  = removalDate(expiry, shelf);
+  const regs = loadRegs().map(r => r.id === _editingId
+    ? { ...r, person, company, partno, expiry, shelf, rd }
+    : r
+  );
+  saveRegs(regs);
+  closeEditModal();
+  renderRegList(loadRegs());
+  updateSummary();
+  showToast('✅ 編集を保存しました');
+}
+
+document.getElementById('edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+});
+['edit-person','edit-company','edit-partno','edit-expiry','edit-shelf'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmEdit();
+  });
+});
+
+// edit-company サジェスト
+document.getElementById('edit-company').addEventListener('input', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('focus', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('blur', () => {
+  setTimeout(hideEditSuggest, 150);
+});
+function showEditSuggest(val) {
+  const wrap = document.getElementById('edit-company-suggest');
+  const all  = getCompanyHistory();
+  const q    = val.trim().toLowerCase();
+  const matches = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  if (!matches.length) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = matches.slice(0,6).map(name => {
+    let html = name;
+    if (q) {
+      const idx = name.toLowerCase().indexOf(q);
+      html = name.slice(0,idx) + `<span class="suggest-match">${name.slice(idx,idx+q.length)}</span>` + name.slice(idx+q.length);
+    }
+    return `<div class="suggest-item" data-name="${name.replace(/"/g,'&quot;')}">${html}</div>`;
+  }).join('');
+  wrap.style.display = 'block';
+  wrap.querySelectorAll('.suggest-item').forEach(el => {
+    el.addEventListener('mousedown', e => e.preventDefault());
+    el.addEventListener('click', () => {
+      document.getElementById('edit-company').value = el.dataset.name;
+      hideEditSuggest();
+    });
+  });
+}
+function hideEditSuggest() {
+  const el = document.getElementById('edit-company-suggest');
+  if (el) el.style.display = 'none';
+}
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -1158,6 +1542,24 @@ document.getElementById('modal-company').addEventListener('blur', () => {
   --red-dim: #FCEAEA;
   --purple: #6A3EA1;
   --purple-dim: #F3EDFF;
+}
+body.dark {
+  --bg: #16141A;
+  --surface: #1F1D26;
+  --surface2: #2A2733;
+  --border: #3A3744;
+  --text: #F0EEF8;
+  --sub: #9490A8;
+  --accent: #E07040;
+  --accent2: #C05030;
+  --green: #5BBF86;
+  --green-dim: #1A3528;
+  --yellow: #C8A840;
+  --yellow-dim: #2E2810;
+  --red: #E05858;
+  --red-dim: #2E1414;
+  --purple: #9B72D8;
+  --purple-dim: #211640;
 }
 
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -1710,6 +2112,27 @@ input:focus { border-color: var(--accent); }
 .suggest-item:last-child { border-bottom: none; }
 .suggest-item:active, .suggest-item:hover { background: var(--surface2); }
 .suggest-match { color: var(--accent); font-weight: 700; }
+
+/* ── サマリーカード ── */
+.summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:2px; }
+.summary-cell {
+  background: var(--surface2); border-radius: 12px; padding: 12px 8px;
+  text-align: center; border: 1.5px solid var(--border);
+  cursor: pointer; transition: border-color .15s;
+}
+.summary-cell:active { border-color: var(--accent); }
+.summary-cell .s-num  { font-size: 22px; font-weight: 900; line-height: 1.1; margin-bottom: 3px; }
+.summary-cell .s-lbl  { font-size: 10px; font-weight: 700; color: var(--sub); letter-spacing: .04em; }
+.summary-cell.urgent  { background: var(--red-dim); border-color: rgba(170,40,40,.25); }
+.summary-cell.urgent .s-num { color: var(--red); }
+.summary-cell.done    { background: var(--green-dim); border-color: rgba(58,125,88,.25); }
+.summary-cell.done .s-num   { color: var(--green); }
+.summary-cell.total   { background: var(--surface2); }
+.summary-cell.total .s-num  { color: var(--accent); }
+
+/* ── 編集モーダル ── */
+.edit-label { font-size:11px; font-weight:700; color:var(--sub); letter-spacing:.04em; margin-bottom:5px; margin-top:10px; }
+.edit-label:first-child { margin-top:0; }
 </style>
 </head>
 <body>
@@ -1722,6 +2145,7 @@ input:focus { border-color: var(--accent); }
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div id="fb-dot" title="Firebase接続状態" style="width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.3);flex-shrink:0;transition:background .3s"></div>
+      <button id="btn-darkmode" onclick="toggleDark()" style="width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="ダーク/ライト切替">🌙</button>
       <button id="btn-settings" style="width:34px;height:34px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">⚙️</button>
     </div>
   </div>
@@ -1796,6 +2220,22 @@ input:focus { border-color: var(--accent); }
 
   <!-- 単体パネル -->
   <div id="panel-single">
+
+  <!-- サマリーカード -->
+  <div class="summary-grid" id="summary-grid">
+    <div class="summary-cell total" onclick="switchTab('list');setListFilter('all')">
+      <div class="s-num" id="s-total">0</div>
+      <div class="s-lbl">登録件数</div>
+    </div>
+    <div class="summary-cell urgent" onclick="switchTab('list');setListFilter('active')">
+      <div class="s-num" id="s-urgent">0</div>
+      <div class="s-lbl">⚠️ 期限7日以内</div>
+    </div>
+    <div class="summary-cell done" onclick="switchTab('list');setListFilter('done')">
+      <div class="s-num" id="s-done">0</div>
+      <div class="s-lbl">✅ 処理済</div>
+    </div>
+  </div>
 
   <!-- 入力カード -->
   <div class="card">
@@ -1908,6 +2348,31 @@ input:focus { border-color: var(--accent); }
       <div class="modal-btns">
         <button class="modal-btn cancel" onclick="closeModal()">キャンセル</button>
         <button class="modal-btn ok" onclick="confirmRegister()">登録する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集モーダル -->
+  <div class="modal-overlay" id="edit-overlay">
+    <div class="modal-box">
+      <div class="modal-title">✏️ 登録内容を編集</div>
+      <div class="edit-label">担当者名</div>
+      <input type="text" class="modal-input" id="edit-person"  placeholder="例：山田 太郎" maxlength="30">
+      <div class="edit-label">会社名</div>
+      <div class="suggest-wrap">
+        <input type="text" class="modal-input" id="edit-company" placeholder="例：株式会社〇〇" maxlength="40" autocomplete="off" style="margin-bottom:0">
+        <div class="suggest-list" id="edit-company-suggest" style="display:none"></div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="edit-label">品番</div>
+      <input type="text" class="modal-input" id="edit-partno"  placeholder="例：AB-1234" maxlength="30">
+      <div class="edit-label">賞味期限</div>
+      <input type="date" class="modal-input" id="edit-expiry">
+      <div class="edit-label">基本賞味期限（日数）</div>
+      <input type="number" class="modal-input" id="edit-shelf" min="1" placeholder="例：180">
+      <div class="modal-btns" style="margin-top:4px">
+        <button class="modal-btn cancel" onclick="closeEditModal()">キャンセル</button>
+        <button class="modal-btn ok" onclick="confirmEdit()">保存する</button>
       </div>
     </div>
   </div>
@@ -2581,6 +3046,7 @@ function renderRegList(regs) {
     return;
   }
   const sorted = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
+  updateSummary();
   el.innerHTML = sorted.map(r => {
     const cls = getStatusCls(r.rd);
     const d   = daysLeft(r.rd);
@@ -2598,7 +3064,10 @@ function renderRegList(regs) {
           賞味期限：${r.expiry}　基本：${r.shelf}日
         </div>
       </div>
-      <button class="reg-del" onclick="confirmDelete(${r.id},'${(r.company||r.name||'未設定').replace(/'/g,'')}')" title="削除">🗑</button>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <button class="reg-del" style="background:var(--surface2);color:var(--accent);border-color:var(--accent)" onclick="openEditModal(${r.id})" title="編集">✏️</button>
+        <button class="reg-del" onclick="confirmDelete(${r.id},'${(r.company||r.name||'未設定').replace(/'/g,'')}')" title="削除">🗑</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -2858,11 +3327,11 @@ document.getElementById('qr-close').addEventListener('click', closeQRScanner);
 // ── 初期化：Firebase設定があれば自動接続 ──
 (function init() {
   _regs = localLoadRegs();
+  updateSummary();
   const cfg = loadFbConfig();
   if (cfg && cfg.apiKey && cfg.databaseURL) {
     initFirebase(cfg); // onValueでデータ取得→_regs更新→renderCalendar
   } else {
-    // Firebase未設定の場合もローカルデータでバナー表示
     setTimeout(showAlertBanner, 500);
   }
 })();
@@ -3151,6 +3620,27 @@ function exportPDF() {
   .print-btn button { padding:10px 20px; border-radius:8px; font-size:12pt; font-family:inherit; font-weight:700; cursor:pointer; }
   .btn-print  { background:#C85A2E; color:#fff; border:none; }
   .btn-close  { background:#F7F5F2; color:#6B6760; border:1.5px solid #E4E0D8; }
+
+/* ── サマリーカード ── */
+.summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:2px; }
+.summary-cell {
+  background: var(--surface2); border-radius: 12px; padding: 12px 8px;
+  text-align: center; border: 1.5px solid var(--border);
+  cursor: pointer; transition: border-color .15s;
+}
+.summary-cell:active { border-color: var(--accent); }
+.summary-cell .s-num  { font-size: 22px; font-weight: 900; line-height: 1.1; margin-bottom: 3px; }
+.summary-cell .s-lbl  { font-size: 10px; font-weight: 700; color: var(--sub); letter-spacing: .04em; }
+.summary-cell.urgent  { background: var(--red-dim); border-color: rgba(170,40,40,.25); }
+.summary-cell.urgent .s-num { color: var(--red); }
+.summary-cell.done    { background: var(--green-dim); border-color: rgba(58,125,88,.25); }
+.summary-cell.done .s-num   { color: var(--green); }
+.summary-cell.total   { background: var(--surface2); }
+.summary-cell.total .s-num  { color: var(--accent); }
+
+/* ── 編集モーダル ── */
+.edit-label { font-size:11px; font-weight:700; color:var(--sub); letter-spacing:.04em; margin-bottom:5px; margin-top:10px; }
+.edit-label:first-child { margin-top:0; }
 </style>
 </head>
 <body>
@@ -3192,6 +3682,134 @@ function exportPDF() {
   if (!w) { showToast('⚠️ ポップアップをブロックしています。許可してください。'); return; }
   w.document.write(html);
   w.document.close();
+}
+
+// ════════════════════════════
+//  ダークモード
+// ════════════════════════════
+const DARK_KEY = 'darkmode_v1';
+function toggleDark() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem(DARK_KEY, isDark ? '1' : '0');
+  document.getElementById('btn-darkmode').textContent = isDark ? '☀️' : '🌙';
+}
+// 起動時に設定を復元
+(function initDark() {
+  if (localStorage.getItem(DARK_KEY) === '1') {
+    document.body.classList.add('dark');
+    const btn = document.getElementById('btn-darkmode');
+    if (btn) btn.textContent = '☀️';
+  }
+})();
+
+// ════════════════════════════
+//  サマリー更新
+// ════════════════════════════
+function updateSummary() {
+  const regs = loadRegs();
+  const total  = regs.length;
+  const done   = regs.filter(r => r.done).length;
+  const urgent = regs.filter(r => !r.done && daysLeft(r.rd) <= 7).length;
+  const sTotal  = document.getElementById('s-total');
+  const sUrgent = document.getElementById('s-urgent');
+  const sDone   = document.getElementById('s-done');
+  if (sTotal)  sTotal.textContent  = total;
+  if (sUrgent) sUrgent.textContent = urgent;
+  if (sDone)   sDone.textContent   = done;
+}
+
+// ════════════════════════════
+//  編集モーダル
+// ════════════════════════════
+let _editingId = null;
+
+function openEditModal(id) {
+  const regs = loadRegs();
+  const r = regs.find(x => x.id === id);
+  if (!r) return;
+  _editingId = id;
+  document.getElementById('edit-person').value  = r.person  || '';
+  document.getElementById('edit-company').value = r.company || r.name || '';
+  document.getElementById('edit-partno').value  = r.partno  || '';
+  document.getElementById('edit-expiry').value  = r.expiry  || '';
+  document.getElementById('edit-shelf').value   = r.shelf   || '';
+  hideEditSuggest();
+  document.getElementById('edit-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('edit-person').focus(), 300);
+}
+
+function closeEditModal() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  _editingId = null;
+  hideEditSuggest();
+}
+
+function confirmEdit() {
+  if (!_editingId) return;
+  const person  = document.getElementById('edit-person').value.trim();
+  const company = document.getElementById('edit-company').value.trim() || '未設定';
+  const partno  = document.getElementById('edit-partno').value.trim();
+  const expiry  = document.getElementById('edit-expiry').value;
+  const shelf   = parseInt(document.getElementById('edit-shelf').value);
+  if (!expiry || !shelf) { showToast('⚠️ 賞味期限と基本賞味期限は必須です'); return; }
+
+  const rd  = removalDate(expiry, shelf);
+  const regs = loadRegs().map(r => r.id === _editingId
+    ? { ...r, person, company, partno, expiry, shelf, rd }
+    : r
+  );
+  saveRegs(regs);
+  closeEditModal();
+  renderRegList(loadRegs());
+  updateSummary();
+  showToast('✅ 編集を保存しました');
+}
+
+document.getElementById('edit-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-overlay')) closeEditModal();
+});
+['edit-person','edit-company','edit-partno','edit-expiry','edit-shelf'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmEdit();
+  });
+});
+
+// edit-company サジェスト
+document.getElementById('edit-company').addEventListener('input', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('focus', function() {
+  showEditSuggest(this.value);
+});
+document.getElementById('edit-company').addEventListener('blur', () => {
+  setTimeout(hideEditSuggest, 150);
+});
+function showEditSuggest(val) {
+  const wrap = document.getElementById('edit-company-suggest');
+  const all  = getCompanyHistory();
+  const q    = val.trim().toLowerCase();
+  const matches = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  if (!matches.length) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = matches.slice(0,6).map(name => {
+    let html = name;
+    if (q) {
+      const idx = name.toLowerCase().indexOf(q);
+      html = name.slice(0,idx) + `<span class="suggest-match">${name.slice(idx,idx+q.length)}</span>` + name.slice(idx+q.length);
+    }
+    return `<div class="suggest-item" data-name="${name.replace(/"/g,'&quot;')}">${html}</div>`;
+  }).join('');
+  wrap.style.display = 'block';
+  wrap.querySelectorAll('.suggest-item').forEach(el => {
+    el.addEventListener('mousedown', e => e.preventDefault());
+    el.addEventListener('click', () => {
+      document.getElementById('edit-company').value = el.dataset.name;
+      hideEditSuggest();
+    });
+  });
+}
+function hideEditSuggest() {
+  const el = document.getElementById('edit-company-suggest');
+  if (el) el.style.display = 'none';
 }
 </script>
 </body>
