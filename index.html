@@ -9,254 +9,6 @@
 <meta name="theme-color" content="#1a1a2e">
 <title>賞味期限チェック計算機[ver.1.1]</title>
 <!-- jsPDF for PDF export -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-// ════════════════════════════
-//  PDF エクスポート
-// ════════════════════════════
-function exportPDF() {
-  const regs = loadRegs();
-  if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
-  const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
-  let filtered = regs;
-  if (f === 'active') filtered = filtered.filter(r => !r.done);
-  if (f === 'done')   filtered = filtered.filter(r =>  r.done);
-  filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
-
-  // ── テーブルデータ
-  const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
-    const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
-
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
-
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
-}
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js">
-// ════════════════════════════
-//  PDF エクスポート
-// ════════════════════════════
-function exportPDF() {
-  const regs = loadRegs();
-  if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
-  const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
-  let filtered = regs;
-  if (f === 'active') filtered = filtered.filter(r => !r.done);
-  if (f === 'done')   filtered = filtered.filter(r =>  r.done);
-  filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
-
-  // ── テーブルデータ
-  const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
-    const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
-
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
-
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
-}
-</script>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js">
 // ════════════════════════════
@@ -632,127 +384,7 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 });
 
 // ════════════════════════════
-//  PDF エクスポート
-// ════════════════════════════
-function exportPDF() {
-  const regs = loadRegs();
-  if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
-  const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
-  let filtered = regs;
-  if (f === 'active') filtered = filtered.filter(r => !r.done);
-  if (f === 'done')   filtered = filtered.filter(r =>  r.done);
-  filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
-
-  // ── テーブルデータ
-  const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
-    const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
-
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
-
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
-}
+//  PDF エクスポート（ブラウザ印刷）
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js">
 // ════════════════════════════
@@ -1128,127 +760,7 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 });
 
 // ════════════════════════════
-//  PDF エクスポート
-// ════════════════════════════
-function exportPDF() {
-  const regs = loadRegs();
-  if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
-  const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
-  let filtered = regs;
-  if (f === 'active') filtered = filtered.filter(r => !r.done);
-  if (f === 'done')   filtered = filtered.filter(r =>  r.done);
-  filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
-
-  // ── テーブルデータ
-  const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
-    const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
-
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
-
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
-}
+//  PDF エクスポート（ブラウザ印刷）
 </script>
 <!-- QRスキャン -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js">
@@ -1625,127 +1137,7 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 });
 
 // ════════════════════════════
-//  PDF エクスポート
-// ════════════════════════════
-function exportPDF() {
-  const regs = loadRegs();
-  if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
-  const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
-  let filtered = regs;
-  if (f === 'active') filtered = filtered.filter(r => !r.done);
-  if (f === 'done')   filtered = filtered.filter(r =>  r.done);
-  filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
-
-  // ── テーブルデータ
-  const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
-    const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
-
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
-
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
-}
+//  PDF エクスポート（ブラウザ印刷）
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -3689,126 +3081,117 @@ document.getElementById('modal-company').addEventListener('blur', () => {
 });
 
 // ════════════════════════════
-//  PDF エクスポート
+//  PDF エクスポート（ブラウザ印刷）
 // ════════════════════════════
 function exportPDF() {
   const regs = loadRegs();
   if (!regs.length) { showToast('⚠️ 登録済みのデータがありません'); return; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  // ── フォント設定（日本語対応：標準フォントで文字化け回避のためデータを整形）
-  const PAGE_W = 210;
-  const MARGIN = 14;
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-
-  // ── ヘッダー
-  doc.setFillColor(200, 90, 46);
-  doc.rect(0, 0, PAGE_W, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Expiry Stock Removal List', MARGIN, 10);
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ver.1.1  /  1/3 Rule Calculator', MARGIN, 16);
-  doc.text('Export: ' + dateLabel, PAGE_W - MARGIN, 16, { align: 'right' });
-
-  // ── サブヘッダー（フィルター情報）
   const f = typeof _listFilter !== 'undefined' ? _listFilter : 'all';
-  const filterLabel = f === 'active' ? '[Filter: Active only]' : f === 'done' ? '[Filter: Done only]' : '[Filter: All]';
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(8);
-  doc.text(filterLabel + '  Total: ' + regs.length + ' items', MARGIN, 28);
-
-  // ── フィルター適用
   let filtered = regs;
   if (f === 'active') filtered = filtered.filter(r => !r.done);
   if (f === 'done')   filtered = filtered.filter(r =>  r.done);
   filtered = [...filtered].sort((a,b) => new Date(a.rd) - new Date(b.rd));
 
-  // ── テーブルデータ
+  const now = new Date();
+  const dateLabel = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const filterLabel = f === 'active' ? '未処理のみ' : f === 'done' ? '処理済のみ' : 'すべて';
+
   const rows = filtered.map((r, i) => {
-    const d = daysLeft(r.rd);
+    const d   = daysLeft(r.rd);
+    const cls = getStatusCls(r.rd);
     const statusLabel = d < 0
-      ? 'OVER ' + Math.abs(d) + 'd'
-      : d === 0 ? 'TODAY'
-      : d <= 7  ? 'URGENT ' + d + 'd'
-      : d <= 30 ? 'SOON ' + d + 'd'
-      : 'OK ' + d + 'd';
-    return [
-      String(i + 1),
-      (r.company || r.name || '-').substring(0, 20),
-      (r.partno  || '-').substring(0, 15),
-      (r.person  || '-').substring(0, 12),
-      r.expiry   || '-',
-      fmt(r.rd),
-      statusLabel,
-      r.done ? 'Done' : 'Active',
-    ];
-  });
+      ? `<span style="color:#6A3EA1;font-weight:700">${Math.abs(d)}日超過</span>`
+      : d === 0 ? `<span style="color:#AA2828;font-weight:700">本日</span>`
+      : d <= 7  ? `<span style="color:#AA2828;font-weight:700">残${d}日</span>`
+      : d <= 30 ? `<span style="color:#9A7A18;font-weight:700">残${d}日</span>`
+      :           `<span style="color:#3A7D58;font-weight:700">残${d}日</span>`;
+    const doneLabel = r.done
+      ? '<span style="color:#3A7D58;font-weight:700">✅ 処理済</span>'
+      : '<span style="color:#AA2828">未処理</span>';
+    return `<tr class="${i%2===0?'even':'odd'}${r.done?' done':''}">
+      <td style="text-align:center">${i+1}</td>
+      <td>${r.company||r.name||'-'}</td>
+      <td style="font-family:monospace">${r.partno||'-'}</td>
+      <td>${r.person||'-'}</td>
+      <td style="font-family:monospace">${r.expiry||'-'}</td>
+      <td style="font-family:monospace;font-weight:700">${fmt(r.rd)}</td>
+      <td style="text-align:center">${statusLabel}</td>
+      <td style="text-align:center">${doneLabel}</td>
+    </tr>`;
+  }).join('');
 
-  // ── AutoTable
-  doc.autoTable({
-    startY: 32,
-    head: [['#', 'Company', 'Part No.', 'Person', 'Expiry', 'Removal Date', 'Status', 'State']],
-    body: rows,
-    styles: {
-      font: 'helvetica',
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'ellipsize',
-    },
-    headStyles: {
-      fillColor: [200, 90, 46],
-      textColor: 255,
-      fontStyle: 'bold',
-      fontSize: 8,
-    },
-    alternateRowStyles: { fillColor: [247, 245, 242] },
-    columnStyles: {
-      0: { cellWidth: 8,  halign: 'center' },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 28 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 26 },
-      6: { cellWidth: 22 },
-      7: { cellWidth: 17, halign: 'center' },
-    },
-    didDrawCell: (data) => {
-      // ステータスによってセルの文字色を変更
-      if (data.section === 'body' && data.column.index === 6) {
-        const val = String(data.cell.raw);
-        if (val.startsWith('OVER'))   doc.setTextColor(106, 62, 161);
-        else if (val.startsWith('URGENT') || val === 'TODAY') doc.setTextColor(170, 40, 40);
-        else if (val.startsWith('SOON')) doc.setTextColor(154, 122, 24);
-        else                           doc.setTextColor(58, 125, 88);
-      }
-      if (data.section === 'body' && data.column.index === 7) {
-        const val = String(data.cell.raw);
-        if (val === 'Done') doc.setTextColor(58, 125, 88);
-        else                doc.setTextColor(30, 28, 24);
-      }
-    },
-    // フッター
-    didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(180, 180, 180);
-      doc.text(
-        `Page ${data.pageNumber} / ${pageCount}`,
-        PAGE_W / 2, 290, { align: 'center' }
-      );
-    },
-  });
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>在庫落とし日一覧 ${dateLabel}</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Zen Kaku Gothic New',sans-serif; font-size:10pt; color:#1E1C18; padding:12mm 10mm; }
+  .hdr { background:#C85A2E; color:#fff; padding:10px 16px; border-radius:8px; margin-bottom:12px; display:flex; align-items:flex-end; justify-content:space-between; }
+  .hdr-title { font-size:16pt; font-weight:900; }
+  .hdr-meta  { font-size:8pt; opacity:.85; text-align:right; line-height:1.7; }
+  .sub { font-size:8pt; color:#6B6760; margin-bottom:8px; }
+  table { width:100%; border-collapse:collapse; font-size:8.5pt; }
+  th { background:#C85A2E; color:#fff; font-weight:700; padding:6px 8px; text-align:left; }
+  th:first-child, th:nth-child(7), th:nth-child(8) { text-align:center; }
+  td { padding:6px 8px; border-bottom:1px solid #E4E0D8; vertical-align:middle; }
+  tr.even td { background:#F7F5F2; }
+  tr.done td { opacity:.55; }
+  tr.done td:nth-child(2) { text-decoration:line-through; }
+  .footer { margin-top:10px; font-size:7pt; color:#aaa; text-align:right; }
+  @media print {
+    body { padding:0; }
+    @page { size:A4; margin:12mm 10mm; }
+    .no-print { display:none; }
+  }
+  .print-btn { display:flex; gap:10px; margin-bottom:14px; }
+  .print-btn button { padding:10px 20px; border-radius:8px; font-size:12pt; font-family:inherit; font-weight:700; cursor:pointer; }
+  .btn-print  { background:#C85A2E; color:#fff; border:none; }
+  .btn-close  { background:#F7F5F2; color:#6B6760; border:1.5px solid #E4E0D8; }
+</style>
+</head>
+<body>
+<div class="print-btn no-print">
+  <button class="btn-print" onclick="window.print()">🖨️　PDFとして保存 / 印刷</button>
+  <button class="btn-close" onclick="window.close()">✕　閉じる</button>
+</div>
+<div class="hdr">
+  <div>
+    <div class="hdr-title">在庫落とし日一覧</div>
+    <div style="font-size:9pt;opacity:.85;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.1.1</div>
+  </div>
+  <div class="hdr-meta">
+    出力日：${dateLabel}<br>
+    フィルター：${filterLabel}　件数：${filtered.length}件
+  </div>
+</div>
+<table>
+  <thead><tr>
+    <th style="width:28px">No.</th>
+    <th>会社名</th>
+    <th>品番</th>
+    <th>担当者名</th>
+    <th>賞味期限</th>
+    <th>在庫落とし日</th>
+    <th style="width:70px">残り日数</th>
+    <th style="width:60px">状態</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">賞味期限チェック計算機 ver.1.1　／　出力日時：${dateLabel}</div>
+<script>
+  // フォント読み込み後に自動印刷ダイアログは表示しない（ボタン操作のみ）
+<\/script>
+</body>
+</html>`;
 
-  // ── ダウンロード
-  const fileName = `stock_removal_list_${dateLabel.replace(/\//g, '')}.pdf`;
-  doc.save(fileName);
-  showToast('✅ PDFをダウンロードしました');
+  const w = window.open('', '_blank');
+  if (!w) { showToast('⚠️ ポップアップをブロックしています。許可してください。'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 </script>
 </body>
