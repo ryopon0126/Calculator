@@ -638,6 +638,78 @@ input[type=date]:focus,input[type=number]:focus{
   opacity:0;transition:opacity .2s;
   white-space:nowrap;max-width:90vw;text-align:center;pointer-events:none;
 }
+
+/* ── アップデート通知ポップアップ ── */
+.update-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.update-overlay.open { opacity: 1; pointer-events: all; }
+.update-box {
+  background: #fff; border-radius: 24px;
+  width: 100%; max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  overflow: hidden;
+  transform: scale(.94) translateY(8px);
+  transition: transform .3s cubic-bezier(.32,0,.14,1);
+}
+.update-overlay.open .update-box { transform: scale(1) translateY(0); }
+.update-hdr {
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  padding: 20px 20px 16px;
+}
+.update-hdr-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.update-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  background: rgba(255,255,255,.25); color: #fff;
+  padding: 3px 10px; border-radius: 20px;
+}
+.update-ver { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -.01em; }
+.update-sub { font-size: 12px; color: rgba(255,255,255,.75); margin-top: 2px; }
+.update-body { padding: 18px 20px 8px; }
+.update-list { list-style: none; margin-bottom: 4px; }
+.update-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid #EAEAF2;
+  font-size: 13px; line-height: 1.5;
+}
+.update-list li:last-child { border-bottom: none; }
+.update-list-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; margin-top: 1px;
+}
+.update-list-icon.orange { background: #FEF1EE; }
+.update-list-icon.green  { background: #F0FDF4; }
+.update-list-icon.blue   { background: #EFF6FF; }
+.update-list-icon.amber  { background: #FFFBEB; }
+.update-list-text-title { font-weight: 700; color: #111118; margin-bottom: 2px; }
+.update-list-text-desc  { font-size: 12px; color: #6E6E82; }
+.update-ftr {
+  padding: 12px 20px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.update-close-btn {
+  width: 100%; padding: 15px; border-radius: 14px;
+  border: none; background: linear-gradient(135deg, #C85A2E, #a04020);
+  color: #fff; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+}
+.update-today-check {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 13px; color: #6E6E82; cursor: pointer;
+}
+.update-today-check input[type=checkbox] {
+  width: 18px; height: 18px; cursor: pointer; accent-color: #C85A2E;
+  border: none; padding: 0; background: none; border-radius: 4px;
+}
 </style>
 </head>
 <body>
@@ -847,7 +919,7 @@ input[type=date]:focus,input[type=number]:focus{
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-hdr">
-      <div class="modal-title">📌 在庫落とし日を登録</div>
+      <div class="modal-title" id="modal-reg-title">📌 在庫落とし日を登録</div>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -962,6 +1034,58 @@ input[type=date]:focus,input[type=number]:focus{
 </div>
 
 <div id="toast-el"></div>
+
+
+<!-- ══ アップデート通知ポップアップ ══ -->
+<div class="update-overlay" id="update-overlay">
+  <div class="update-box">
+    <div class="update-hdr">
+      <div class="update-hdr-top">
+        <span class="update-badge">🆕 UPDATE</span>
+      </div>
+      <div class="update-ver">ver.1.2 アップデート</div>
+      <div class="update-sub">賞味期限チェック計算機</div>
+    </div>
+    <div class="update-body">
+      <ul class="update-list">
+        <li>
+          <div class="update-list-icon orange">📋</div>
+          <div>
+            <div class="update-list-text-title">一括計算からの登録</div>
+            <div class="update-list-text-desc">一括計算の結果から直接カレンダーに登録できるようになりました</div>
+          </div>
+        </li>
+        <li>
+          <div class="update-list-icon green">📄</div>
+          <div>
+            <div class="update-list-text-title">PDF出力の選択機能</div>
+            <div class="update-list-text-desc">すべて・1ヶ月以内のみを選んでPDF出力できます</div>
+          </div>
+        </li>
+        <li>
+          <div class="update-list-icon amber">⚠️</div>
+          <div>
+            <div class="update-list-text-title">警告閾値を1ヶ月以内に変更</div>
+            <div class="update-list-text-desc">在庫落とし日まで30日以内の商品を警告表示します</div>
+          </div>
+        </li>
+        <li>
+          <div class="update-list-icon blue">🎨</div>
+          <div>
+            <div class="update-list-text-title">UIを全面リニューアル</div>
+            <div class="update-list-text-desc">ボトムナビ・カード型デザインに刷新しました</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="update-ftr">
+      <button class="update-close-btn" onclick="closeUpdatePopup()">確認しました</button>
+      <label class="update-today-check">
+        <input type="checkbox" id="update-no-today"> 今日は表示しない
+      </label>
+    </div>
+  </div>
+</div>
 
 <!-- ══ PDF出力選択モーダル ══ -->
 <div class="modal-overlay" id="pdf-overlay">
@@ -1211,28 +1335,67 @@ document.getElementById('bulk-calc-btn').addEventListener('click', () => {
   }
   results.sort((a,b)=>new Date(a.rd)-new Date(b.rd));
   window._bulkCopyText = results.map((r,i)=>`${i+1}. 賞味期限:${fmt(r.exp)} 基本賞味期限:${r.shelf}日 → 在庫落とし日:${fmt(r.rd)}（${r.dtrN>=0?'残'+r.dtrN+'日':Math.abs(r.dtrN)+'日超過'}）`).join('\n');
+  // 結果をグローバルに保持（登録ボタン用）
+  window._bulkResults = results;
   const rows2 = results.map((r,i)=>`
     <tr>
-      <td style="font-weight:700">${i+1}</td>
-      <td style="font-family:'DM Mono',monospace">${fmt(r.exp)}</td>
-      <td style="text-align:center">${r.shelf}日</td>
-      <td style="font-family:'DM Mono',monospace;font-weight:700">${fmt(r.rd)}</td>
+      <td style="font-weight:700;text-align:center">${i+1}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${fmt(r.exp)}</td>
+      <td style="text-align:center;font-size:11px">${r.shelf}日</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:700;font-size:11px">${fmt(r.rd)}</td>
       <td><span class="badge ${r.cls}">${r.emoji} ${r.dtrN>=0?'残'+r.dtrN+'日':Math.abs(r.dtrN)+'日超過'}</span></td>
+      <td style="text-align:center"><button id="bulk-reg-btn-${i}" class="bulk-reg-btn" onclick="openBulkRegModal(${i})" style="padding:6px 10px;border-radius:8px;border:1.5px solid rgba(200,90,46,.3);background:var(--acc-bg);color:var(--accent);font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">📌 登録</button></td>
     </tr>`).join('');
   document.getElementById('bulk-result-area').innerHTML = `
     <div class="card">
       <div class="card-body">
-        <div style="display:flex;gap:8px;margin-bottom:4px">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
           <button class="action-btn copy" onclick="copyBulk()">📋 コピー</button>
           <button class="action-btn share" onclick="shareBulk()">🔗 シェア</button>
         </div>
         <table class="bulk-result-table">
-          <thead><tr><th>#</th><th>賞味期限</th><th style="text-align:center">基本</th><th>在庫落とし日</th><th>状態</th></tr></thead>
+          <thead><tr><th>#</th><th>賞味期限</th><th style="text-align:center">基本</th><th>在庫落とし日</th><th>状態</th><th style="text-align:center">登録</th></tr></thead>
           <tbody>${rows2}</tbody>
         </table>
       </div>
     </div>`;
 });
+
+
+// ── アップデート通知ポップアップ ──
+const UPDATE_VER_KEY = 'update_seen_v1.2';
+function showUpdatePopup() {
+  const today = new Date().toDateString();
+  const seen  = localStorage.getItem(UPDATE_VER_KEY);
+  if (seen === today) return;
+  setTimeout(() => {
+    document.getElementById('update-overlay').classList.add('open');
+  }, 600);
+}
+function closeUpdatePopup() {
+  document.getElementById('update-overlay').classList.remove('open');
+  if (document.getElementById('update-no-today').checked) {
+    localStorage.setItem(UPDATE_VER_KEY, new Date().toDateString());
+  }
+}
+
+// ── 一括計算からの登録 ──
+let _bulkRegIdx = null;
+function openBulkRegModal(idx) {
+  const r = (window._bulkResults||[])[idx];
+  if (!r) return;
+  _bulkRegIdx = idx;
+  // 登録モーダルを流用（rd・expiry・shelfを設定）
+  _modalRd = r.rd; _modalExpiry = fmt(r.exp); _modalShelf = r.shelf;
+  document.getElementById('modal-person').value  = '';
+  document.getElementById('modal-company').value = '';
+  document.getElementById('modal-partno').value  = '';
+  // モーダルタイトルを変更
+  document.getElementById('modal-reg-title').textContent = `📌 登録：${fmt(r.rd)}`;
+  hideSuggest();
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('modal-person').focus(), 300);
+}
 
 // ── コピー・シェア ──
 function copyResult(rd, expiry, shelf, dtr, status) {
@@ -1293,6 +1456,7 @@ function initFirebase(cfg) {
       if (document.getElementById('panel-list') && document.getElementById('panel-list').style.display !== 'none') renderRegList(_regs);
       updateSummary();
       showAlertBanner();
+      showUpdatePopup();
     }, err => { hideSync(); console.error(err); });
     _db.ref('.info/connected').on('value', snap => {
       const dot = document.getElementById('fb-dot');
@@ -1333,9 +1497,16 @@ function confirmRegister() {
   saveRegs(regs);
   closeModal();
   updateSummary();
+  // 単体計算のボタン更新
   if (_modalBtnId) {
     const b = document.getElementById(_modalBtnId);
     if (b) { b.textContent='✅ 登録済み'; b.classList.add('registered'); }
+  }
+  // 一括計算のボタン更新
+  if (_bulkRegIdx !== null) {
+    const bb = document.getElementById('bulk-reg-btn-' + _bulkRegIdx);
+    if (bb) { bb.textContent='✅ 登録済'; bb.style.background='var(--grn-bg)'; bb.style.borderColor='rgba(22,163,74,.3)'; bb.style.color='var(--green)'; bb.disabled=true; }
+    _bulkRegIdx = null;
   }
   showToast('✅ 登録しました');
 }
@@ -1828,7 +1999,79 @@ function doExportPDF(mode){
   }).join('');
   const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>在庫落とし日一覧 ${dateLabel}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans JP',sans-serif;font-size:10pt;color:#111118;padding:12mm 10mm}.hdr{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;padding:12px 18px;border-radius:10px;margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between}.hdr-title{font-size:18pt;font-weight:900;letter-spacing:-.02em}.hdr-meta{font-size:8pt;opacity:.85;text-align:right;line-height:1.8}table{width:100%;border-collapse:collapse;font-size:8.5pt}th{background:#2C2C38;color:#fff;font-weight:700;padding:7px 9px;text-align:left}td{padding:7px 9px;border-bottom:1px solid #EAEAF2;vertical-align:middle}tr.even td{background:#F6F6FA}tr.done td{opacity:.5}tr.done td:nth-child(2){text-decoration:line-through}.footer{margin-top:10px;font-size:7pt;color:#aaa;text-align:right}.pbtn{display:flex;gap:10px;margin-bottom:14px}.pbtn button{padding:10px 20px;border-radius:8px;font-size:12pt;font-family:inherit;font-weight:700;cursor:pointer}.pbtn .p{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;border:none}.pbtn .c{background:#F6F6FA;color:#6E6E82;border:1.5px solid #EAEAF2}@media print{.pbtn{display:none}@page{size:A4;margin:12mm 10mm}}</style></head><body>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans JP',sans-serif;font-size:10pt;color:#111118;padding:12mm 10mm}.hdr{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;padding:12px 18px;border-radius:10px;margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between}.hdr-title{font-size:18pt;font-weight:900;letter-spacing:-.02em}.hdr-meta{font-size:8pt;opacity:.85;text-align:right;line-height:1.8}table{width:100%;border-collapse:collapse;font-size:8.5pt}th{background:#2C2C38;color:#fff;font-weight:700;padding:7px 9px;text-align:left}td{padding:7px 9px;border-bottom:1px solid #EAEAF2;vertical-align:middle}tr.even td{background:#F6F6FA}tr.done td{opacity:.5}tr.done td:nth-child(2){text-decoration:line-through}.footer{margin-top:10px;font-size:7pt;color:#aaa;text-align:right}.pbtn{display:flex;gap:10px;margin-bottom:14px}.pbtn button{padding:10px 20px;border-radius:8px;font-size:12pt;font-family:inherit;font-weight:700;cursor:pointer}.pbtn .p{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;border:none}.pbtn .c{background:#F6F6FA;color:#6E6E82;border:1.5px solid #EAEAF2}@media print{.pbtn{display:none}@page{size:A4;margin:12mm 10mm}}
+/* ── アップデート通知ポップアップ ── */
+.update-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.update-overlay.open { opacity: 1; pointer-events: all; }
+.update-box {
+  background: #fff; border-radius: 24px;
+  width: 100%; max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  overflow: hidden;
+  transform: scale(.94) translateY(8px);
+  transition: transform .3s cubic-bezier(.32,0,.14,1);
+}
+.update-overlay.open .update-box { transform: scale(1) translateY(0); }
+.update-hdr {
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  padding: 20px 20px 16px;
+}
+.update-hdr-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.update-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  background: rgba(255,255,255,.25); color: #fff;
+  padding: 3px 10px; border-radius: 20px;
+}
+.update-ver { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -.01em; }
+.update-sub { font-size: 12px; color: rgba(255,255,255,.75); margin-top: 2px; }
+.update-body { padding: 18px 20px 8px; }
+.update-list { list-style: none; margin-bottom: 4px; }
+.update-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid #EAEAF2;
+  font-size: 13px; line-height: 1.5;
+}
+.update-list li:last-child { border-bottom: none; }
+.update-list-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; flex-shrink: 0; margin-top: 1px;
+}
+.update-list-icon.orange { background: #FEF1EE; }
+.update-list-icon.green  { background: #F0FDF4; }
+.update-list-icon.blue   { background: #EFF6FF; }
+.update-list-icon.amber  { background: #FFFBEB; }
+.update-list-text-title { font-weight: 700; color: #111118; margin-bottom: 2px; }
+.update-list-text-desc  { font-size: 12px; color: #6E6E82; }
+.update-ftr {
+  padding: 12px 20px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.update-close-btn {
+  width: 100%; padding: 15px; border-radius: 14px;
+  border: none; background: linear-gradient(135deg, #C85A2E, #a04020);
+  color: #fff; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+}
+.update-today-check {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 13px; color: #6E6E82; cursor: pointer;
+}
+.update-today-check input[type=checkbox] {
+  width: 18px; height: 18px; cursor: pointer; accent-color: #C85A2E;
+  border: none; padding: 0; background: none; border-radius: 4px;
+}
+</style></head><body>
 <div class="pbtn"><button class="p" onclick="window.print()">🖨️ PDFとして保存</button><button class="c" onclick="window.close()">✕ 閉じる</button></div>
 <div class="hdr"><div><div class="hdr-title">在庫落とし日一覧</div><div style="font-size:9pt;opacity:.85;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.1.2</div></div><div class="hdr-meta">出力日：${dateLabel}<br>対象：${filterLabel}　件数：${filtered.length}件</div></div>
 <table><thead><tr><th style="width:28px">No.</th><th>会社名</th><th>品番</th><th>担当者名</th><th>賞味期限</th><th>在庫落とし日</th><th style="width:70px">残り日数</th><th style="width:60px">状態</th></tr></thead><tbody>${rows}</tbody></table>
@@ -1848,7 +2091,9 @@ document.getElementById('pdf-overlay').addEventListener('click',e=>{
   renderCalendar();
   const cfg=loadFbConfig();
   if(cfg&&cfg.apiKey&&cfg.databaseURL){ initFirebase(cfg); }
+  if(!cfg||!cfg.apiKey) showUpdatePopup();
   else { setTimeout(showAlertBanner,500); }
+  showUpdatePopup();
 })();
 (function checkUrlCfgOnLoad(){})(); // checkUrlCfg is already called above via IIFE
 </script>
