@@ -963,6 +963,43 @@ input[type=date]:focus,input[type=number]:focus{
 
 <div id="toast-el"></div>
 
+<!-- ══ PDF出力選択モーダル ══ -->
+<div class="modal-overlay" id="pdf-overlay">
+  <div class="modal-sheet" style="max-height:70vh">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-title">📄 PDF出力</div>
+      <button class="modal-close" onclick="closePdfModal()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+      <p style="font-size:13px;color:var(--sub);line-height:1.6">出力する範囲を選択してください。</p>
+      <button onclick="doExportPDF('all')" style="display:flex;align-items:center;justify-content:space-between;padding:18px;border-radius:16px;border:2px solid var(--line);background:var(--bg);cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='#C85A2E'" onmouseout="this.style.borderColor='var(--line)'">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:3px">📋 すべての登録商品</div>
+          <div style="font-size:12px;color:var(--sub)">処理済・未処理を含む全件を出力</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span id="pdf-all-count" style="font-size:20px;font-weight:900;color:var(--ink)">0件</span>
+          <span style="font-size:10px;color:var(--sub)">全件</span>
+        </div>
+      </button>
+      <button onclick="doExportPDF('urgent')" style="display:flex;align-items:center;justify-content:space-between;padding:18px;border-radius:16px;border:2px solid rgba(232,52,26,.25);background:var(--acc-bg);cursor:pointer;font-family:inherit;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='#E8341A'" onmouseout="this.style.borderColor='rgba(232,52,26,.25)'">
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:3px">⚠️ 1ヶ月以内の商品のみ</div>
+          <div style="font-size:12px;color:var(--sub)">在庫落とし日まで30日以内（未処理）</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span id="pdf-urgent-count" style="font-size:20px;font-weight:900;color:var(--accent)">0件</span>
+          <span style="font-size:10px;color:var(--sub)">該当件数</span>
+        </div>
+      </button>
+    </div>
+    <div class="modal-ftr">
+      <button class="modal-cancel" style="width:100%" onclick="closePdfModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── PATCH: JS が参照するクラス名を新UIに合わせて上書き ───
 
@@ -1756,30 +1793,53 @@ function updateSummary(){
 function exportPDF(){
   const regs=loadRegs();
   if(!regs.length){showToast('⚠️ 登録済みのデータがありません');return;}
+  // 1ヶ月以内の件数を事前カウントしてバッジ表示
+  const urgentCount=regs.filter(r=>!r.done&&daysLeft(r.rd)<=30).length;
+  document.getElementById('pdf-all-count').textContent=regs.length+'件';
+  document.getElementById('pdf-urgent-count').textContent=urgentCount+'件';
+  document.getElementById('pdf-overlay').classList.add('open');
+}
+
+function closePdfModal(){
+  document.getElementById('pdf-overlay').classList.remove('open');
+}
+
+function doExportPDF(mode){
+  closePdfModal();
+  const regs=loadRegs();
   let filtered=[...regs];
-  if(_listFilter==='active') filtered=filtered.filter(r=>!r.done);
-  if(_listFilter==='done')   filtered=filtered.filter(r=>r.done);
+  let filterLabel='';
+  if(mode==='urgent'){
+    filtered=filtered.filter(r=>!r.done&&daysLeft(r.rd)<=30);
+    filterLabel='1ヶ月以内（未処理）';
+  } else {
+    filterLabel='すべて';
+  }
+  if(!filtered.length){showToast('⚠️ 該当するデータがありません');return;}
   filtered.sort((a,b)=>new Date(a.rd)-new Date(b.rd));
   const now=new Date();
   const dateLabel=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
-  const filterLabel=_listFilter==='active'?'未処理のみ':_listFilter==='done'?'処理済のみ':'すべて';
+  const accentColor = mode==='urgent' ? '#E8341A' : '#C85A2E';
   const rows=filtered.map((r,i)=>{
     const d=daysLeft(r.rd);
-    const sl=d<0?`<span style="color:#7C3AED;font-weight:700">${Math.abs(d)}日超過</span>`:d===0?`<span style="color:#E8341A;font-weight:700">本日</span>`:d<=7?`<span style="color:#E8341A;font-weight:700">残${d}日</span>`:d<=30?`<span style="color:#D97706;font-weight:700">残${d}日</span>`:`<span style="color:#16A34A;font-weight:700">残${d}日</span>`;
+    const sl=d<0?`<span style="color:#7C3AED;font-weight:700">${Math.abs(d)}日超過</span>`:d===0?`<span style="color:#E8341A;font-weight:700">本日</span>`:d<=30?`<span style="color:#E8341A;font-weight:700">残${d}日</span>`:`<span style="color:#16A34A;font-weight:700">残${d}日</span>`;
     const dl=r.done?'<span style="color:#16A34A;font-weight:700">✅ 処理済</span>':'<span style="color:#E8341A">未処理</span>';
     return `<tr class="${i%2===0?'even':''}${r.done?' done':''}"><td style="text-align:center">${i+1}</td><td>${r.company||r.name||'-'}</td><td style="font-family:monospace">${r.partno||'-'}</td><td>${r.person||'-'}</td><td style="font-family:monospace">${r.expiry||'-'}</td><td style="font-family:monospace;font-weight:700">${fmt(r.rd)}</td><td style="text-align:center">${sl}</td><td style="text-align:center">${dl}</td></tr>`;
   }).join('');
   const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>在庫落とし日一覧 ${dateLabel}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans JP',sans-serif;font-size:10pt;color:#111118;padding:12mm 10mm}.hdr{background:#111118;color:#fff;padding:12px 18px;border-radius:10px;margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between}.hdr-title{font-size:18pt;font-weight:900;letter-spacing:-.02em}.hdr-meta{font-size:8pt;opacity:.7;text-align:right;line-height:1.8}table{width:100%;border-collapse:collapse;font-size:8.5pt}th{background:#111118;color:#fff;font-weight:700;padding:7px 9px;text-align:left}td{padding:7px 9px;border-bottom:1px solid #EAEAF2;vertical-align:middle}tr.even td{background:#F6F6FA}tr.done td{opacity:.5}tr.done td:nth-child(2){text-decoration:line-through}.footer{margin-top:10px;font-size:7pt;color:#aaa;text-align:right}.pbtn{display:flex;gap:10px;margin-bottom:14px}.pbtn button{padding:10px 20px;border-radius:8px;font-size:12pt;font-family:inherit;font-weight:700;cursor:pointer}.pbtn .p{background:#111118;color:#fff;border:none}.pbtn .c{background:#F6F6FA;color:#6E6E82;border:1.5px solid #EAEAF2}@media print{.pbtn{display:none}@page{size:A4;margin:12mm 10mm}}</style></head><body>
-<div class="pbtn no-print"><button class="p" onclick="window.print()">🖨️ PDFとして保存</button><button class="c" onclick="window.close()">✕ 閉じる</button></div>
-<div class="hdr"><div><div class="hdr-title">在庫落とし日一覧</div><div style="font-size:9pt;opacity:.7;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.1.2</div></div><div class="hdr-meta">出力日：${dateLabel}<br>フィルター：${filterLabel}　件数：${filtered.length}件</div></div>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans JP',sans-serif;font-size:10pt;color:#111118;padding:12mm 10mm}.hdr{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;padding:12px 18px;border-radius:10px;margin-bottom:14px;display:flex;align-items:flex-end;justify-content:space-between}.hdr-title{font-size:18pt;font-weight:900;letter-spacing:-.02em}.hdr-meta{font-size:8pt;opacity:.85;text-align:right;line-height:1.8}table{width:100%;border-collapse:collapse;font-size:8.5pt}th{background:#2C2C38;color:#fff;font-weight:700;padding:7px 9px;text-align:left}td{padding:7px 9px;border-bottom:1px solid #EAEAF2;vertical-align:middle}tr.even td{background:#F6F6FA}tr.done td{opacity:.5}tr.done td:nth-child(2){text-decoration:line-through}.footer{margin-top:10px;font-size:7pt;color:#aaa;text-align:right}.pbtn{display:flex;gap:10px;margin-bottom:14px}.pbtn button{padding:10px 20px;border-radius:8px;font-size:12pt;font-family:inherit;font-weight:700;cursor:pointer}.pbtn .p{background:linear-gradient(135deg,${accentColor},#a04020);color:#fff;border:none}.pbtn .c{background:#F6F6FA;color:#6E6E82;border:1.5px solid #EAEAF2}@media print{.pbtn{display:none}@page{size:A4;margin:12mm 10mm}}</style></head><body>
+<div class="pbtn"><button class="p" onclick="window.print()">🖨️ PDFとして保存</button><button class="c" onclick="window.close()">✕ 閉じる</button></div>
+<div class="hdr"><div><div class="hdr-title">在庫落とし日一覧</div><div style="font-size:9pt;opacity:.85;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.1.2</div></div><div class="hdr-meta">出力日：${dateLabel}<br>対象：${filterLabel}　件数：${filtered.length}件</div></div>
 <table><thead><tr><th style="width:28px">No.</th><th>会社名</th><th>品番</th><th>担当者名</th><th>賞味期限</th><th>在庫落とし日</th><th style="width:70px">残り日数</th><th style="width:60px">状態</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="footer">賞味期限チェック計算機 ver.1.2　／　出力日：${dateLabel}</div></body></html>`;
+<div class="footer">賞味期限チェック計算機 ver.1.2　／　出力日：${dateLabel}　／　対象：${filterLabel}</div></body></html>`;
   const w=window.open('','_blank');
   if(!w){showToast('⚠️ ポップアップを許可してください');return;}
   w.document.write(html); w.document.close();
 }
+document.getElementById('pdf-overlay').addEventListener('click',e=>{
+  if(e.target===document.getElementById('pdf-overlay')) closePdfModal();
+});
 
 // ── 初期化 ──
 (function init(){
