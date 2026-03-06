@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="1/3計算">
 <meta name="theme-color" content="#C85A2E">
-<title>賞味期限チェック[ver.1.2]</title>
+<title>賞味期限チェック[ver.2.0]</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -710,21 +710,127 @@ input[type=date]:focus,input[type=number]:focus{
   width: 18px; height: 18px; cursor: pointer; accent-color: #C85A2E;
   border: none; padding: 0; background: none; border-radius: 4px;
 }
+
+/* ── パスワードロック画面 ── */
+.pw-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: linear-gradient(160deg, #1a1018 0%, #2d1a10 60%, #1a1810 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 28px;
+  padding-top: calc(env(safe-area-inset-top) + 32px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+  transition: opacity .4s, transform .4s;
+}
+.pw-screen.hide {
+  opacity: 0; pointer-events: none;
+  transform: translateY(-16px);
+}
+.pw-logo {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px; color: #fff; letter-spacing: -.02em;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(200,90,46,.4);
+}
+.pw-title {
+  font-size: 20px; font-weight: 900; color: #fff;
+  letter-spacing: -.01em; margin-bottom: 4px; text-align: center;
+}
+.pw-sub {
+  font-size: 13px; color: rgba(255,255,255,.45);
+  margin-bottom: 40px; text-align: center;
+}
+.pw-card {
+  width: 100%; max-width: 360px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 20px; padding: 24px;
+  backdrop-filter: blur(10px);
+}
+.pw-label {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.5);
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 8px; display: block;
+}
+.pw-input {
+  width: 100%; background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.15);
+  border-radius: 13px; padding: 16px 18px;
+  font-size: 18px; font-weight: 700; color: #fff;
+  font-family: 'DM Mono', monospace;
+  outline: none; letter-spacing: .15em;
+  transition: border-color .15s, box-shadow .15s;
+  caret-color: #C85A2E;
+}
+.pw-input::placeholder { color: rgba(255,255,255,.2); letter-spacing: .05em; font-weight: 400; }
+.pw-input:focus {
+  border-color: #C85A2E;
+  box-shadow: 0 0 0 3px rgba(200,90,46,.25);
+  background: rgba(255,255,255,.1);
+}
+.pw-btn {
+  width: 100%; margin-top: 14px;
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  color: #fff; border: none; border-radius: 13px;
+  padding: 17px; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(200,90,46,.4);
+  transition: opacity .15s, transform .15s;
+}
+.pw-btn:active { opacity: .85; transform: scale(.98); }
+.pw-error {
+  margin-top: 12px; font-size: 13px; font-weight: 700;
+  color: #ff6b6b; text-align: center;
+  min-height: 20px; transition: opacity .2s;
+}
+.pw-hint {
+  margin-top: 20px; font-size: 11px; color: rgba(255,255,255,.25);
+  text-align: center; line-height: 1.7;
+}
+.pw-no-fb {
+  margin-top: 16px; padding: 12px 16px;
+  background: rgba(255,165,0,.1); border: 1px solid rgba(255,165,0,.2);
+  border-radius: 10px; font-size: 12px; color: rgba(255,200,100,.8);
+  text-align: center; line-height: 1.6;
+}
 </style>
 </head>
 <body>
 
 <!-- TOP BAR -->
+
+<!-- ══ パスワードロック画面 ══ -->
+<div class="pw-screen" id="pw-screen">
+  <div class="pw-logo">⅓</div>
+  <div class="pw-title">賞味期限チェック計算機</div>
+  <div class="pw-sub">ver.2.0　／　社内利用</div>
+  <div class="pw-card">
+    <label class="pw-label" for="pw-input">🔒 パスワードを入力</label>
+    <input class="pw-input" type="password" id="pw-input" placeholder="パスワード" autocomplete="current-password">
+    <button class="pw-btn" id="pw-btn">ログイン</button>
+    <div class="pw-error" id="pw-error"></div>
+    <div class="pw-hint" id="pw-hint">パスワードはFirebaseコンソールで設定します</div>
+    <div class="pw-no-fb" id="pw-no-fb" style="display:none">
+      ⚠️ Firebase未接続のため<br>パスワード認証を使用できません。<br>先にFirebase設定を行ってください。
+    </div>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="tb-brand">
     <div class="tb-mark">⅓</div>
     <div class="tb-text">
       <div class="tb-name">賞味期限チェック計算機</div>
-      <div class="tb-ver">ver.1.2</div>
+      <div class="tb-ver">ver.2.0</div>
     </div>
   </div>
   <div class="tb-right">
     <div class="fb-dot" id="fb-dot" title="Firebase接続状態"></div>
+    <button class="tb-btn" id="btn-howto-hdr" onclick="openHowtoSheet()" title="使い方" style="width:auto;padding:0 10px;font-size:12px;font-weight:700;letter-spacing:.02em">使い方</button>
     <button class="tb-btn" id="btn-settings" title="Firebase設定">⚙️</button>
   </div>
 </div>
@@ -820,7 +926,11 @@ input[type=date]:focus,input[type=number]:focus{
           </div>
           <div class="howto-step">
             <div class="howto-num">5</div>
-            <div class="howto-text"><strong>カレンダーに登録：</strong><span class="howto-tag">📌 カレンダーに登録</span>から会社名・品番を入力して登録。📅タブで確認できます。</div>
+            <div class="howto-text"><strong>カレンダーに登録：</strong><span class="howto-tag">📌 カレンダーに登録</span>から会社名・品番を入力して登録。📅タブで確認できます。一括計算の結果からも各行の登録ボタンで同様に登録できます。</div>
+          </div>
+          <div class="howto-step">
+            <div class="howto-num">6</div>
+            <div class="howto-text"><strong>PDF出力：</strong><span class="howto-tag">📦 一覧</span>タブの<span class="howto-tag">📄 PDF</span>ボタンをタップ。<strong>すべての登録商品</strong>または<strong>1ヶ月以内の商品のみ</strong>を選んでPDF形式で保存できます。ブラウザのポップアップ許可が必要です。</div>
           </div>
         </div>
       </div>
@@ -1043,7 +1153,7 @@ input[type=date]:focus,input[type=number]:focus{
       <div class="update-hdr-top">
         <span class="update-badge">🆕 UPDATE</span>
       </div>
-      <div class="update-ver">ver.1.2 アップデート</div>
+      <div class="update-ver">ver.2.0 アップデート</div>
       <div class="update-sub">賞味期限チェック計算機</div>
     </div>
     <div class="update-body">
@@ -1083,6 +1193,51 @@ input[type=date]:focus,input[type=number]:focus{
       <label class="update-today-check">
         <input type="checkbox" id="update-no-today"> 今日は表示しない
       </label>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ 使い方シート ══ -->
+<div class="modal-overlay" id="howto-overlay">
+  <div class="modal-sheet" style="max-height:90vh">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr">
+      <div class="modal-title">📖 使い方</div>
+      <button class="modal-close" onclick="closeHowtoSheet()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="howto-step" style="border-top:1px solid var(--line)">
+        <div class="howto-num">1</div>
+        <div class="howto-text"><strong>賞味期限を入力：</strong>商品パッケージに記載の賞味期限を入力します。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">2</div>
+        <div class="howto-text"><strong>基本賞味期限を選択：</strong>プリセットボタンか直接入力で日数を設定します。よく使う日数は＋ボタンで保存できます。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">3</div>
+        <div class="howto-text"><strong>計算ボタンをタップ：</strong>1/3ルールに基づいた在庫落とし日が表示されます。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">4</div>
+        <div class="howto-text"><strong>一括計算：</strong><span class="howto-tag">📋 一括</span>タブで複数商品を同時に計算できます。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">5</div>
+        <div class="howto-text"><strong>カレンダーに登録：</strong><span class="howto-tag">📌 カレンダーに登録</span>から会社名・品番を入力して登録。<span class="howto-tag">📅 カレンダー</span>タブで日付別に確認できます。一括計算の各行からも登録できます。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">6</div>
+        <div class="howto-text"><strong>PDF出力：</strong><span class="howto-tag">📦 一覧</span>タブの<span class="howto-tag">📄 PDF</span>ボタンをタップ。<strong>すべての登録商品</strong>または<strong>1ヶ月以内の商品のみ</strong>を選択してPDFとして保存できます。ブラウザのポップアップ許可が必要です。</div>
+      </div>
+      <div class="howto-step">
+        <div class="howto-num">7</div>
+        <div class="howto-text"><strong>クラウド同期（Firebase）：</strong>⚙️ボタンからFirebase設定を行うと、複数端末でデータを共有できます。QRコードや共有URLでかんたんに設定できます。</div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="modal-ok" style="width:100%" onclick="closeHowtoSheet()">閉じる</button>
     </div>
   </div>
 </div>
@@ -1155,6 +1310,17 @@ function fmt(dateStr) {
   return `${y}/${m}/${d}`;
 }
 
+
+function fmtDateTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const da = String(d.getDate()).padStart(2,'0');
+  const h  = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${y}/${mo}/${da} ${h}:${mi}`;
+}
 function fmtShort(dateStr) {
   const [y,m,d] = dateStr.split('-');
   return `${m}/${d}`;
@@ -1362,8 +1528,95 @@ document.getElementById('bulk-calc-btn').addEventListener('click', () => {
 });
 
 
+
+// ── 使い方シート ──
+function openHowtoSheet() {
+  document.getElementById('howto-overlay').classList.add('open');
+}
+function closeHowtoSheet() {
+  document.getElementById('howto-overlay').classList.remove('open');
+}
+document.getElementById('howto-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('howto-overlay')) closeHowtoSheet();
+});
+
+
+// ── パスワードロック ──
+const PW_SESSION_KEY = 'pw_unlocked_v2';
+
+function initPasswordLock() {
+  // 今日のセッションで認証済みならスキップ
+  if (sessionStorage.getItem(PW_SESSION_KEY) === 'yes') {
+    unlockApp(false);
+    return;
+  }
+  const cfg = loadFbConfig();
+  if (!cfg || !cfg.apiKey || !cfg.databaseURL) {
+    // Firebase未接続：パスワード機能が使えない旨を表示
+    document.getElementById('pw-no-fb').style.display = 'block';
+    document.getElementById('pw-hint').style.display  = 'none';
+    document.getElementById('pw-btn').textContent = 'Firebase設定後に再起動';
+    document.getElementById('pw-btn').onclick = () => {
+      unlockApp(false); // Firebase未設定時はそのまま開く
+      setTimeout(() => openFbSheet(), 300);
+    };
+    document.getElementById('pw-input').style.display = 'none';
+    return;
+  }
+  // Firebaseからパスワード取得
+  const pwRef = firebase.database().ref('settings/password');
+  pwRef.once('value').then(snap => {
+    const stored = snap.val();
+    if (!stored) {
+      // パスワード未設定：そのまま開く
+      document.getElementById('pw-hint').textContent = '⚠️ パスワード未設定のため認証をスキップします';
+      setTimeout(() => unlockApp(true), 1200);
+      return;
+    }
+    // パスワード入力を受け付ける
+    const doLogin = () => {
+      const input = document.getElementById('pw-input').value;
+      if (!input) { showPwError('パスワードを入力してください'); return; }
+      if (input === stored) {
+        sessionStorage.setItem(PW_SESSION_KEY, 'yes');
+        unlockApp(true);
+      } else {
+        showPwError('パスワードが正しくありません');
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+      }
+    };
+    document.getElementById('pw-btn').onclick = doLogin;
+    document.getElementById('pw-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+    setTimeout(() => document.getElementById('pw-input').focus(), 400);
+  }).catch(() => {
+    // 読み取り失敗（ルール制限等）→そのまま開く
+    document.getElementById('pw-hint').textContent = 'パスワード確認に失敗しました。そのまま続行します...';
+    setTimeout(() => unlockApp(true), 1500);
+  });
+}
+
+function showPwError(msg) {
+  const el = document.getElementById('pw-error');
+  el.textContent = '⚠️ ' + msg;
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 3000);
+}
+
+function unlockApp(animate) {
+  const screen = document.getElementById('pw-screen');
+  if (animate) {
+    screen.classList.add('hide');
+    setTimeout(() => screen.style.display = 'none', 450);
+  } else {
+    screen.style.display = 'none';
+  }
+}
+
 // ── アップデート通知ポップアップ ──
-const UPDATE_VER_KEY = 'update_seen_v1.2';
+const UPDATE_VER_KEY = 'update_seen_v2.0';
 function showUpdatePopup() {
   const today = new Date().toDateString();
   const seen  = localStorage.getItem(UPDATE_VER_KEY);
@@ -1493,7 +1746,8 @@ function confirmRegister() {
   const partno  = document.getElementById('modal-partno').value.trim() || '';
   const regs = loadRegs();
   const id = Date.now();
-  regs.push({id, person, company, partno, rd:_modalRd, expiry:_modalExpiry, shelf:_modalShelf, done:false});
+  const createdAt = new Date().toISOString();
+  regs.push({id, person, company, partno, rd:_modalRd, expiry:_modalExpiry, shelf:_modalShelf, done:false, createdAt});
   saveRegs(regs);
   closeModal();
   updateSummary();
@@ -1541,11 +1795,18 @@ function renderCalendar() {
       return `<div class="cal-dot ${cls}">${label}</div>`;
     }).join('');
     if(hits.length>2) dots+=`<div class="cal-dot ok">+${hits.length-2}</div>`;
-    html+=`<div class="cal-day${isToday?' today':''}${hits.length?' has-items':''}" ${hits.length?`onclick="openDetail('${dateStr}',${JSON.stringify(hits).replace(/'/g,"\\'")})"`:''}>
+    html+=`<div class="cal-day${isToday?' today':''} ${hits.length?'has-items':''}" data-cal="${dateStr}">
       <span>${d2}</span>${dots}
     </div>`;
   }
-  document.getElementById('cal-grid').innerHTML = html;
+  const calGrid = document.getElementById('cal-grid');
+  calGrid.innerHTML = html;
+  window._calRdMap = rdMap;
+  calGrid.onclick = e => {
+    const cell = e.target.closest('[data-cal]');
+    if (!cell || !cell.classList.contains('has-items')) return;
+    openDetail(cell.dataset.cal);
+  };
 }
 
 // ── 詳細モーダル ──
@@ -1554,6 +1815,8 @@ function openDetail(dateStr, hits) {
   _detailDateStr=dateStr;
   const regs=loadRegs();
   _detailItems=regs.filter(r=>r.rd===dateStr);
+  // フォールバック：引数 or グローバルマップ
+  if(!_detailItems.length && window._calRdMap && window._calRdMap[dateStr]) _detailItems=window._calRdMap[dateStr];
   if(!_detailItems.length && hits) _detailItems=hits;
   document.getElementById('detail-title').textContent=`📅 ${fmt(dateStr)}`;
   document.getElementById('detail-overlay').classList.add('open');
@@ -1588,6 +1851,10 @@ function renderDetailList() {
         <div class="d-cell full">
           <div class="d-cell-lbl">計算式</div>
           <div class="d-cell-val">${r.expiry||'-'} − ${rmDays}日 ＝ ${fmt(r.rd)}</div>
+        </div>
+        <div class="d-cell full">
+          <div class="d-cell-lbl">🕐 登録日時</div>
+          <div class="d-cell-val">${fmtDateTime(r.createdAt)}</div>
         </div>
       </div>
       <div class="d-btns">
@@ -1629,7 +1896,11 @@ function renderDetailList() {
     });
   });
 }
-function closeDetail() { document.getElementById('detail-overlay').classList.remove('open'); }
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  // 一覧が表示中なら再描画
+  if (document.getElementById('panel-list').style.display !== 'none') renderRegList(loadRegs());
+}
 
 // ── 登録一覧 ──
 let _listFilter='all';
@@ -1664,8 +1935,8 @@ function renderRegList(regs) {
   el.innerHTML=sorted.map(r=>{
     const cls=getStatusCls(r.rd), d=daysLeft(r.rd);
     const statusLabel=d<0?`${Math.abs(d)}日超過`:d===0?'本日':`残${d}日`;
-    return `<div class="reg-item${r.done?' done':''}">
-      <div class="reg-main">
+    return `<div class="reg-item${r.done?' done':''}" data-reg-id="${r.id}" style="cursor:pointer">
+      <div class="reg-main" onclick="openDetail('${r.rd}')">
         <div class="reg-company">${r.company||r.name||'未設定'}${r.done?'<span class="done-badge">✅ 処理済</span>':''}</div>
         <div class="reg-sub">
           ${r.partno?`<span class="reg-partno">${r.partno}</span>`:''}
@@ -1673,7 +1944,8 @@ function renderRegList(regs) {
         </div>
         <div class="reg-dates">
           在庫落とし日：${fmt(r.rd)}　<span class="badge ${cls}">${statusLabel}</span><br>
-          賞味期限：${r.expiry}　基本：${r.shelf}日
+          賞味期限：${r.expiry}　基本：${r.shelf}日<br>
+          <span style="font-size:10px;color:var(--subtle)">🕐 登録：${fmtDateTime(r.createdAt)}</span>
         </div>
       </div>
       <div class="reg-btns">
@@ -2071,11 +2343,98 @@ function doExportPDF(mode){
   width: 18px; height: 18px; cursor: pointer; accent-color: #C85A2E;
   border: none; padding: 0; background: none; border-radius: 4px;
 }
+
+/* ── パスワードロック画面 ── */
+.pw-screen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: linear-gradient(160deg, #1a1018 0%, #2d1a10 60%, #1a1810 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 28px;
+  padding-top: calc(env(safe-area-inset-top) + 32px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
+  transition: opacity .4s, transform .4s;
+}
+.pw-screen.hide {
+  opacity: 0; pointer-events: none;
+  transform: translateY(-16px);
+}
+.pw-logo {
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px; color: #fff; letter-spacing: -.02em;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(200,90,46,.4);
+}
+.pw-title {
+  font-size: 20px; font-weight: 900; color: #fff;
+  letter-spacing: -.01em; margin-bottom: 4px; text-align: center;
+}
+.pw-sub {
+  font-size: 13px; color: rgba(255,255,255,.45);
+  margin-bottom: 40px; text-align: center;
+}
+.pw-card {
+  width: 100%; max-width: 360px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 20px; padding: 24px;
+  backdrop-filter: blur(10px);
+}
+.pw-label {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.5);
+  letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 8px; display: block;
+}
+.pw-input {
+  width: 100%; background: rgba(255,255,255,.08);
+  border: 1.5px solid rgba(255,255,255,.15);
+  border-radius: 13px; padding: 16px 18px;
+  font-size: 18px; font-weight: 700; color: #fff;
+  font-family: 'DM Mono', monospace;
+  outline: none; letter-spacing: .15em;
+  transition: border-color .15s, box-shadow .15s;
+  caret-color: #C85A2E;
+}
+.pw-input::placeholder { color: rgba(255,255,255,.2); letter-spacing: .05em; font-weight: 400; }
+.pw-input:focus {
+  border-color: #C85A2E;
+  box-shadow: 0 0 0 3px rgba(200,90,46,.25);
+  background: rgba(255,255,255,.1);
+}
+.pw-btn {
+  width: 100%; margin-top: 14px;
+  background: linear-gradient(135deg, #C85A2E, #a04020);
+  color: #fff; border: none; border-radius: 13px;
+  padding: 17px; font-size: 15px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(200,90,46,.4);
+  transition: opacity .15s, transform .15s;
+}
+.pw-btn:active { opacity: .85; transform: scale(.98); }
+.pw-error {
+  margin-top: 12px; font-size: 13px; font-weight: 700;
+  color: #ff6b6b; text-align: center;
+  min-height: 20px; transition: opacity .2s;
+}
+.pw-hint {
+  margin-top: 20px; font-size: 11px; color: rgba(255,255,255,.25);
+  text-align: center; line-height: 1.7;
+}
+.pw-no-fb {
+  margin-top: 16px; padding: 12px 16px;
+  background: rgba(255,165,0,.1); border: 1px solid rgba(255,165,0,.2);
+  border-radius: 10px; font-size: 12px; color: rgba(255,200,100,.8);
+  text-align: center; line-height: 1.6;
+}
 </style></head><body>
 <div class="pbtn"><button class="p" onclick="window.print()">🖨️ PDFとして保存</button><button class="c" onclick="window.close()">✕ 閉じる</button></div>
-<div class="hdr"><div><div class="hdr-title">在庫落とし日一覧</div><div style="font-size:9pt;opacity:.85;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.1.2</div></div><div class="hdr-meta">出力日：${dateLabel}<br>対象：${filterLabel}　件数：${filtered.length}件</div></div>
+<div class="hdr"><div><div class="hdr-title">在庫落とし日一覧</div><div style="font-size:9pt;opacity:.85;margin-top:2px">1/3ルール 賞味期限チェック計算機 ver.2.0</div></div><div class="hdr-meta">出力日：${dateLabel}<br>対象：${filterLabel}　件数：${filtered.length}件</div></div>
 <table><thead><tr><th style="width:28px">No.</th><th>会社名</th><th>品番</th><th>担当者名</th><th>賞味期限</th><th>在庫落とし日</th><th style="width:70px">残り日数</th><th style="width:60px">状態</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="footer">賞味期限チェック計算機 ver.1.2　／　出力日：${dateLabel}　／　対象：${filterLabel}</div></body></html>`;
+<div class="footer">賞味期限チェック計算機 ver.2.0　／　出力日：${dateLabel}　／　対象：${filterLabel}</div></body></html>`;
   const w=window.open('','_blank');
   if(!w){showToast('⚠️ ポップアップを許可してください');return;}
   w.document.write(html); w.document.close();
@@ -2094,6 +2453,8 @@ document.getElementById('pdf-overlay').addEventListener('click',e=>{
   if(!cfg||!cfg.apiKey) showUpdatePopup();
   else { setTimeout(showAlertBanner,500); }
   showUpdatePopup();
+  // パスワードロック（Firebase接続完了を少し待つ）
+  setTimeout(initPasswordLock, 800);
 })();
 (function checkUrlCfgOnLoad(){})(); // checkUrlCfg is already called above via IIFE
 </script>
