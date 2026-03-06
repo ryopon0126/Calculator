@@ -1549,7 +1549,7 @@ function initPasswordLock() {
 
   const cfg = loadFbConfig();
 
-  // Firebase未接続の場合 → パスワードなしでそのまま開く
+  // Firebase未接続の場合 → そのまま開く
   if (!cfg || !cfg.apiKey || !cfg.databaseURL) {
     document.getElementById('pw-no-fb').style.display = 'block';
     document.getElementById('pw-hint').style.display  = 'none';
@@ -1560,50 +1560,58 @@ function initPasswordLock() {
     return;
   }
 
-  // _db が未初期化ならもう少し待って再試行
-  if (!_db) {
-    setTimeout(initPasswordLock, 500);
-    return;
-  }
+  // Firebase接続済み → 入力画面を表示してボタン押下時に照合
+  document.getElementById('pw-hint').textContent = 'Firebaseで管理されたパスワードを入力してください';
+  document.getElementById('pw-input').style.display = 'block';
 
-  document.getElementById('pw-hint').textContent = '🔒 パスワードを確認中...';
+  const btn = document.getElementById('pw-btn');
+  btn.textContent = 'ログイン';
 
-  _db.ref('settings/password').once('value').then(snap => {
-    const stored = snap.val();
+  const doLogin = () => {
+    const input = document.getElementById('pw-input').value.trim();
+    if (!input) { showPwError('パスワードを入力してください'); return; }
 
-    // パスワード未設定 → スキップ
-    if (!stored) {
-      document.getElementById('pw-hint').textContent = '⚠️ パスワード未設定のためスキップします';
-      setTimeout(() => unlockApp(true), 1000);
-      return;
-    }
+    // ボタンをローディング状態に
+    btn.textContent = '確認中...';
+    btn.disabled = true;
 
-    // パスワード入力モードへ
-    document.getElementById('pw-hint').textContent = 'パスワードはFirebaseコンソールで管理されます';
+    // ログイン時にFirebaseから取得して照合
+    const ref = _db
+      ? _db.ref('settings/password')
+      : firebase.database().ref('settings/password');
 
-    const doLogin = () => {
-      const input = document.getElementById('pw-input').value;
-      if (!input) { showPwError('パスワードを入力してください'); return; }
-      if (input === stored) {
+    ref.once('value').then(snap => {
+      const stored = snap.val();
+
+      if (!stored) {
+        // パスワード未設定 → そのまま通す
+        showPwError('⚠️ パスワードが未設定です。Firebaseに設定してください。');
+        btn.textContent = 'ログイン';
+        btn.disabled = false;
+        return;
+      }
+
+      if (input === String(stored)) {
         sessionStorage.setItem(PW_SESSION_KEY, 'yes');
         unlockApp(true);
       } else {
         showPwError('パスワードが正しくありません');
         document.getElementById('pw-input').value = '';
         document.getElementById('pw-input').focus();
+        btn.textContent = 'ログイン';
+        btn.disabled = false;
       }
-    };
+    }).catch(err => {
+      console.warn('PW fetch error:', err);
+      showPwError('Firebase接続エラー。もう一度お試しください。');
+      btn.textContent = 'ログイン';
+      btn.disabled = false;
+    });
+  };
 
-    document.getElementById('pw-btn').textContent = 'ログイン';
-    document.getElementById('pw-btn').onclick = doLogin;
-    document.getElementById('pw-input').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
-    setTimeout(() => document.getElementById('pw-input').focus(), 200);
-
-  }).catch(err => {
-    console.warn('PW check failed:', err);
-    document.getElementById('pw-hint').textContent = 'パスワード確認に失敗しました。続行します...';
-    setTimeout(() => unlockApp(true), 1500);
-  });
+  btn.onclick = doLogin;
+  document.getElementById('pw-input').onkeydown = e => { if (e.key === 'Enter') doLogin(); };
+  setTimeout(() => document.getElementById('pw-input').focus(), 300);
 }
 
 function showPwError(msg) {
@@ -2451,14 +2459,12 @@ document.getElementById('pdf-overlay').addEventListener('click',e=>{
   const cfg=loadFbConfig();
   if(cfg&&cfg.apiKey&&cfg.databaseURL){
     initFirebase(cfg);
-    // Firebase接続後にパスワードチェック（接続完了まで最大2秒待つ）
-    setTimeout(initPasswordLock, 1200);
   } else {
-    // Firebase未接続はすぐチェック（スキップ画面表示）
-    setTimeout(initPasswordLock, 300);
     setTimeout(showAlertBanner, 500);
   }
   showUpdatePopup();
+  // パスワード画面はすぐ表示（Firebase接続を待たない）
+  setTimeout(initPasswordLock, 300);
 })();
 (function checkUrlCfgOnLoad(){})(); // checkUrlCfg is already called above via IIFE
 </script>
