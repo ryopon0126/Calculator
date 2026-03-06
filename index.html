@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="1/3計算">
-<meta name="theme-color" content="#111118">
+<meta name="theme-color" content="#C85A2E">
 <title>賞味期限チェック[ver.1.2]</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -47,7 +47,7 @@ body{
 
 /* ═══════════════════════ TOP BAR ═══════════════════════ */
 .topbar{
-  background:var(--ink);
+  background:linear-gradient(135deg,#C85A2E,#a04020);
   padding:0 16px;
   padding-top:env(safe-area-inset-top);
   height:calc(54px + env(safe-area-inset-top));
@@ -227,7 +227,7 @@ input[type=date]:focus,input[type=number]:focus{
 /* ═══════════════════════ CALC BTN ═══════════════════════ */
 .calc-btn{
   width:100%;
-  background:var(--ink);color:#fff;
+  background:linear-gradient(135deg,#C85A2E,#a04020);color:#fff;
   border:none;border-radius:14px;padding:18px;
   font-size:15px;font-weight:700;font-family:inherit;
   cursor:pointer;letter-spacing:.02em;
@@ -354,7 +354,7 @@ input[type=date]:focus,input[type=number]:focus{
   cursor:default;position:relative;
 }
 .cal-day.other-month{color:var(--line)}
-.cal-day.today{background:var(--ink);color:#fff;font-weight:900}
+.cal-day.today{background:#C85A2E;color:#fff;font-weight:900}
 .cal-day.has-items{cursor:pointer}
 .cal-day.has-items:active{background:var(--bg)}
 .cal-dot{
@@ -386,7 +386,7 @@ input[type=date]:focus,input[type=number]:focus{
   font-size:12px;font-weight:700;color:var(--sub);
   font-family:inherit;cursor:pointer;transition:all .12s;
 }
-.filter-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.filter-btn.on{background:linear-gradient(135deg,#C85A2E,#a04020);color:#fff;border-color:#C85A2E}
 
 .list-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .pdf-btn{
@@ -435,14 +435,14 @@ input[type=date]:focus,input[type=number]:focus{
 .howto-step{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .howto-step:last-child{border-bottom:none;padding-bottom:0}
 .howto-num{
-  width:24px;height:24px;border-radius:7px;background:var(--ink);color:#fff;
+  width:24px;height:24px;border-radius:7px;background:#C85A2E;color:#fff;
   font-size:11px;font-weight:700;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;margin-top:1px;
 }
 .howto-text{font-size:13px;color:var(--sub);line-height:1.7}
 .howto-text strong{color:var(--ink)}
 .howto-tag{
-  display:inline-block;background:var(--ink);color:#fff;
+  display:inline-block;background:#C85A2E;color:#fff;
   font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;margin:0 2px;vertical-align:middle;
 }
 
@@ -486,7 +486,7 @@ input[type=date]:focus,input[type=number]:focus{
 }
 .modal-ok{
   flex:2;padding:15px;border-radius:13px;
-  border:none;background:var(--ink);
+  border:none;background:linear-gradient(135deg,#C85A2E,#a04020);
   font-size:15px;font-weight:700;color:#fff;font-family:inherit;cursor:pointer;
 }
 .modal-ok:active{opacity:.85}
@@ -595,7 +595,7 @@ input[type=date]:focus,input[type=number]:focus{
 .fb-sub-btn.url{border:1.5px solid rgba(124,58,237,.3);background:var(--vio-bg);color:var(--violet)}
 .fb-connect-btn{
   flex:2;padding:15px;border-radius:13px;border:none;
-  background:var(--ink);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;
+  background:linear-gradient(135deg,#C85A2E,#a04020);color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;
 }
 .fb-disconnect-btn{
   flex:1;padding:15px;border-radius:13px;border:1.5px solid var(--line);
@@ -804,7 +804,7 @@ input[type=date]:focus,input[type=number]:focus{
     <div class="list-hdr">
       <div style="font-size:12px;font-weight:700;color:var(--sub);letter-spacing:.08em;text-transform:uppercase">
         登録済み一覧
-        <span id="reg-count-badge" style="font-size:10px;background:var(--ink);color:#fff;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:4px;vertical-align:middle"></span>
+        <span id="reg-count-badge" style="font-size:10px;background:#C85A2E;color:#fff;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:4px;vertical-align:middle"></span>
       </div>
       <button class="pdf-btn" onclick="exportPDF()">📄 PDF</button>
     </div>
